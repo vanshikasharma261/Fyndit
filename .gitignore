@@ -17,3 +17,6 @@ build/
 # OS / editor
 .DS_Store
 .idea/
+
+# Claude
+CLAUDE.md
