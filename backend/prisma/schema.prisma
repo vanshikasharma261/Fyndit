@@ -58,8 +58,10 @@ model User {
   last_name     String
   phone         String?
 
-  is_active Boolean @default(true)
+  // Inactive until first login; flipped on login/logout (business rules).
+  is_active Boolean @default(false)
 
+  is_deleted Boolean   @default(false)
   deleted_at DateTime?
 
   created_at DateTime @default(now())
