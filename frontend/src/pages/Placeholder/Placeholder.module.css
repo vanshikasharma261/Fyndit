@@ -1,0 +1,19 @@
+.wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--space-6);
+  text-align: center;
+}
+
+.title {
+  margin: 0 0 var(--space-3);
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--color-text-muted);
+}

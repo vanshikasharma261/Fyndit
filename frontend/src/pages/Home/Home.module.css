@@ -1,0 +1,72 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+
+.hero {
+  display: flex;
+  align-items: center;
+  min-height: 360px;
+  padding: var(--space-8);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(
+    135deg,
+    var(--color-primary) 0%,
+    var(--color-primary-light) 100%
+  );
+  color: var(--color-on-primary);
+}
+
+.heroCopy {
+  max-width: 520px;
+}
+
+.eyebrow {
+  margin: 0 0 var(--space-3);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+}
+
+.title {
+  margin: 0;
+  font-size: 2.5rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.subtitle {
+  margin: var(--space-4) 0 var(--space-5);
+  font-size: 1rem;
+  line-height: 1.6;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.cta {
+  padding: var(--space-3) var(--space-6);
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: var(--color-accent);
+  color: var(--color-on-primary);
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.cta:hover {
+  background-color: var(--color-accent-hover);
+}
+
+@media (max-width: 600px) {
+  .hero {
+    padding: var(--space-6);
+  }
+
+  .title {
+    font-size: 1.9rem;
+  }
+}
