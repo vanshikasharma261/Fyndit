@@ -1,26 +1,58 @@
 ## Current Feature
 
-**Products Page UI Improvement — Discount Badge** (spec: `005-ui-improvemnt-products-page.md`)
+**User Module — Profile Management** (spec: `006-user-module.md`)
 
-Branch: `improvement/discount-badge-ui` (cut from `feature/products-browsing`, which carries features 003 + 004 + the access-control hardening).
+Branch: `feature/user-module` (to be cut from `main`).
 
-A small, screenshot-faithful polish on the products listing page: the per-product discount on each product card currently renders as plain accent-coloured text, but the prototype `products_page_clothing_category.png` shows it as a **badge** (soft accent-tinted pill next to the price). CSS-only presentation change — no API/data-contract/Redux/routing/logic changes; `formatDiscountBadge` and badge placement stay as-is.
+Introduces the backend `/user` domain module (read / update / soft-delete the **authenticated** user, identified via `@CurrentUser()` — never a client-supplied id) and the frontend **Profile page** with inline, per-field editing of the "Manage Your Profile" panel. A dummy "Addresses" panel ships on the right as a placeholder; real address management is the next feature.
 
 ## Status
 
-Done.
+Done — backend `/user` module + frontend Profile page implemented; lint/build/test clean on both apps; reviewed (security/prisma/quality/ui) with in-scope fixes applied. See History entry 7.
 
 ## Goal
 
-Restyle `.cardBadge` in `frontend/src/pages/Products/Products.module.css` so the discount renders as a rounded pill (soft accent background + accent text) matching the prototype, using theme variables only (add an accent-subtle token to `theme.css` if one is missing, mirroring `--color-error-subtle`). Detail-page discount is out of scope. See `specs/005-ui-improvemnt-products-page.md` for the full Definition of Done.
+Let a signed-in user view and manage their own profile. Backend: a feature-isolated `user` module mirroring `auth` conventions (thin controller, logic in `UserService`, `PrismaService` only, no `any`, response contract in `user/types/`, copy in a new `UserMessages` group). Every operation runs the existing `AuthService.isUserActive(user.id)` precheck before touching the DB. Frontend: a `ProfilePage` + `features/user/` slice/service/types mirroring the auth feedback model, with per-row inline edit (pencil → input + green tick → confirm) and field-level validation rendered under each row. Screenshots are the source of truth (`profile_ui.png`, `profile_edit_ui.png`, `profile_edit_error_ui.png`). See `specs/006-user-module.md` for the full Definition of Done.
 
-## Implementation
+## Scope / Plan
 
-- Added two theme tokens to `frontend/src/styles/theme.css`: `--color-accent-subtle: rgba(255, 92, 53, 0.12)` (soft accent fill, mirroring the `--color-error-subtle` convention) and `--radius-pill: 999px`.
-- `.cardBadge` in `Products.module.css` is now a pill: `background-color: var(--color-accent-subtle)`, accent text, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-pill)`, `white-space: nowrap`. Existing font size/weight and position next to the price are unchanged.
-- `.cardPriceRow` switched from `align-items: baseline` to `center` so the padded pill sits level with the price.
-- Theme variables only — no hardcoded colours in the module. `formatDiscountBadge`, badge text/percentage logic, API contract, Redux, routing, and the detail page are all untouched (out of scope).
-- Verified: `frontend` `npm run lint` clean and `npm run build` (tsc + vite) succeeds. Visual confirmation against the prototype at the running dev server still to be eyeballed.
+### Backend — `user` module (`backend/src/user/`)
+
+No schema migration needed — `is_deleted`/`deleted_at` and all editable columns already exist on `User`. Structure:
+
+```
+backend/src/user/
+├── user.module.ts          // imports AuthModule (for isUserActive) + PrismaModule
+├── user.controller.ts      // @UseGuards(JwtAuthGuard); @CurrentUser() only
+├── user.service.ts
+├── dto/update-user.dto.ts
+└── types/user.types.ts      // UserProfile response contract (incl. phone)
+```
+
+Register `UserModule` in `AppModule`. All three handlers are guarded and identify the user via `@CurrentUser().id`; **no id is ever read from body/params**.
+
+- **`GET /user`** — `isUserActive` precheck → load by `user_id` with explicit `select` (no `password_hash`/internal flags) → return `UserProfile` (`id`, `email`, `first_name`, `last_name`, `user_name`, **`phone`**). `phone` is added vs the `/auth/me` `UserProfile`; leave `/auth/me` unchanged.
+- **`PATCH /user`** — `isUserActive` precheck → validate `UpdateUserDto` (all fields optional/partial; reuse signup validators + `ValidationMessages`) → update only whitelisted fields → re-select + return `UserProfile`. On email change, preserve uniqueness: catch Prisma `P2002` → field error `{ errors: { email } }`.
+- **`DELETE /user`** (soft delete) — `isUserActive` precheck → set `is_deleted=true`, `deleted_at=now()`, `is_active=false` → clear the auth cookie (reuse `AuthService` cookie-clear options) → `{ message: UserMessages.deleteSuccess }`. Never hard-delete.
+
+Editable fields (map 1:1 to columns): `first_name`, `last_name`, `user_name`, `email`, `phone`. Global pipe `whitelist` + `forbidNonWhitelisted` strips/rejects `password`/ids/extra keys (no escalation). All copy from a new `UserMessages` group in `messages.constant.ts`.
+
+### Frontend — Profile page
+
+Replace the `/profile` placeholder route in `router.tsx` (`<PlaceholderPage title="My Profile" />`) with the real `ProfilePage`, still inside `MainLayout` behind `RequireAuth`. Structure:
+
+```
+frontend/src/
+├── pages/Profile/{ProfilePage.tsx, Profile.module.css}
+├── features/user/{userSlice.ts, userService.ts, types.ts}   // UserState
+└── types/user.types.ts   // UserProfile (incl. phone), UpdateUserRequest; reuse existing error envelopes
+```
+
+- **Layout (`profile_ui.png`):** two columns — left "Manage Your Profile" card with one row per editable field (uppercase label + value + pencil icon); right "Addresses" dummy panel (heading + placeholder only, no API).
+- **Inline edit (`profile_edit_ui.png`):** per-row, click pencil → focused `<input>` + green tick + accent border; click tick → `PATCH /user` with just that field; success → exit edit mode, show new value + success message. One field at a time per row.
+- **Validation (`profile_edit_error_ui.png`):** mirror the auth model in `userSlice`/`UserState` — 400 → `state.errors` (flat `{field: message}` map), other failures → `state.message`. Field errors render **under the offending row** (reserve vertical space, keep accent border). Toast/message shows **"Validation Failed"** for validation errors (not "Something went wrong"), server `message` otherwise.
+- `UserState`: `{ profile, loading, success, message, errors }`; thunks `fetchUser` / `updateUser` / `deleteUser`; reuse the auth slice's `startRequest`/`failRequest` helper pattern; all `fetch` in `userService.ts` with `credentials: "include"`; register the `user` reducer in the store.
+- CSS Modules + theme variables only (no hardcoded colours).
 
 ---
 
@@ -85,40 +117,45 @@ Project CSS variables only. Discount badge + price use accent; active page / Buy
 
 **Backend**
 
-- ☐ `product` module created (controller, service, DTO, types) + registered in `AppModule`
-- ☐ `GET /product/:category` returns paginated products (`items` + `meta`); supports slug + `All`
-- ☐ Parent scopes (Electronics) include descendants; "Clothing" spans both clothing children; unknown slug → empty result with valid meta (no 500)
-- ☐ `search` matches name/brand/description case-insensitive; `page`/`limit` validated; `total` + `total_pages` returned; only active products
-- ☐ `price`/`discount` serialized as `"0.00"` strings (no Decimal/float leakage)
-- ☐ `where` built from a typed options object; price + JSON `attributes` filter at variant level (same-variant match); OR within key / AND across keys; unknown keys ignored
-- ☐ `GET /product/:category/filters` returns price range + per-attribute facets for scope (declared before `:category`); facets from `CategoryAttribute` names + distinct present values
-- ☐ `GET /product/detail/:slug` returns full detail with variants/attributes/images (declared before `:category`); missing/inactive → `NotFoundException` with `ProductMessages` string
-- ☐ Endpoints public (no `JwtAuthGuard`); `PrismaService` only; no `any`
+- ☑ `UserModule` created (controller, service, DTO, types) + registered in `AppModule`
+- ☑ `GET /user` returns the authenticated profile incl. `phone`, no sensitive fields (`PROFILE_SELECT` excludes `password_hash`/internal flags)
+- ☑ `PATCH /user` updates only present whitelisted fields, returns updated profile; unknown keys → 400; email change preserves uniqueness (`P2002` + `meta.target` includes `email` → field error)
+- ☑ `DELETE /user` soft-deletes (`is_deleted`/`deleted_at`/`is_active=false`), clears auth cookie via `AuthService.clearSessionCookie`, never hard-deletes
+- ☑ Every operation runs the `isUserActive` precheck → 401 for inactive/soft-deleted
+- ☑ User identified via `@CurrentUser()` only (no client-supplied id); `PrismaService` only; no `any`; copy from `UserMessages`; validation uses the existing `{ errors: { field } }` envelope
 
 **Frontend**
 
-- ☐ `react-paginate` installed + used via reusable `Pagination` wrapper
-- ☐ Navbar/footer "Books" replaced with "Furniture"
-- ☐ `/product/:category` + `/product/detail/:slug` routes under `MainLayout`; navbar links → correct slug; search → `/product/All?search=<term>`
-- ☐ `productService` holds all fetch logic (no `fetch` in components); `productsSlice` with thunks; `products` reducer registered
-- ☐ Listing page matches `products_page_clothing_category.png`; `FilterSidebar` functional + data-driven from facets (not hardcoded); price range from facets
-- ☐ Toggling a value adds/removes in `attributes` map (empty keys dropped); "Clear filters" resets; filters in URL (`minPrice`/`maxPrice`/`attributes`); deep-link + refresh reproduce grid; filter change resets `page` to 1; facets fetched on category/search change only
-- ☐ Product card: image/name/brand/price/discount badge; pagination driven by `meta` (0-based↔1-based), updates `page` query param
-- ☐ Preview matches `product_preview.png`: gallery, category badge, dynamic attribute selectors, price/discount, stock status, action buttons; selected variant drives price/discount/stock/gallery
-- ☐ URL is source of truth (deep-link + refresh safe); loading/empty/error states; theme variables; CSS Modules only; typed Redux hooks; mobile + desktop responsive
+- ☑ `/profile` renders `ProfilePage` (placeholder removed), behind `RequireAuth` inside `MainLayout`
+- ☑ Left panel matches `profile_ui.png`; right "Addresses" panel is a dummy placeholder (static, `aria-hidden`)
+- ☑ Per-row inline edit (pencil → input + green tick → confirm) matches `profile_edit_ui.png`; success exits edit mode, shows new value + success message (Enter confirms / Esc cancels)
+- ☑ Field validation errors render under the row with reserved space (`profile_edit_error_ui.png`); message shows "Validation Failed", not "Something went wrong"
+- ☑ `userSlice`/`UserState` mirror the auth validation-failure model; all network logic in `userService.ts` (no `fetch` in components); `user` reducer registered
+- ☑ CSS Modules + theme variables only; `npm run lint` + `npm run build` clean (backend + frontend)
+
+---
+
+## Prior Feature — Products Page UI Improvement: Discount Badge (spec: `005-ui-improvemnt-products-page.md`) — Done
+
+Branch `improvement/discount-badge-ui` (cut from `feature/products-browsing`). Small, screenshot-faithful CSS-only polish: the per-product discount on the listing card rendered as plain accent-coloured text; the prototype `products_page_clothing_category.png` shows it as a pill badge.
+
+- **Theme tokens added** (`frontend/src/styles/theme.css`): `--color-accent-subtle: rgba(255, 92, 53, 0.12)` (mirroring `--color-error-subtle`) and `--radius-pill: 999px`.
+- **`.cardBadge`** (`Products.module.css`) is now a pill — accent-subtle background, accent text, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-pill)`, `white-space: nowrap`; existing font size/weight + position unchanged. `.cardPriceRow` switched `align-items: baseline` → `center` so the padded pill sits level with the price.
+- Theme variables only. `formatDiscountBadge`, badge logic, API contract, Redux, routing, and the **detail page** discount are untouched (out of scope) — listing vs detail discount styling now differ by design.
+- **Verified:** frontend `npm run lint` + `npm run build` (tsc + vite) clean. Live visual confirmation at the two breakpoints still to be eyeballed (no browser-automation tooling here).
 
 ---
 
 ## Notes / decisions
 
-- Must consult before/while implementing: `project-overview.md`, `business-rules.md`, `development-rules.md`, `database-design.md`, `prisma-schema.md`. Screenshots are the source of truth and live under `.claude/screenshots/`: `products_page_clothing_category.png` (listing layout + Clothing URL), `search_scenario.png` (search routing — URL `localhost:5173/product/All?search=jeans`), `product_preview.png` (detail layout).
-- **Real seeded category hierarchy** (`backend/prisma/seed-data/categories.data.ts`): Electronics → Mobile Phones · Laptops · Headphones · Smart Watches; Fashion → Men's Clothing · Women's Clothing · Footwear; Home & Kitchen → Cookware · Home Decor · Furniture. There is **no Books category** — that is why the navbar "Books" item is replaced with "Furniture".
-- **Attribute filter param is collapsed into one `attributes` JSON param** (not dynamic per-key params) precisely so the global `ValidationPipe` `whitelist` + `forbidNonWhitelisted` stays intact while supporting arbitrary category-defined attribute names. `ProductVariant.attributes` is JSON → use Prisma JSON path filters (`{ path: [key], equals: value }`).
-- **Attribute names are dynamic per category** (driven by `CategoryAttribute`: Mobile → color/storage/ram; Clothing → color/size). The frontend must NOT hardcode them — derive selector groups from the union of `attributes` keys across returned variants (detail) or from the facets endpoint (sidebar).
-- **Route ordering matters:** declare `detail/:slug` and `:category/filters` **before** the `:category` listing route so routing is unambiguous.
-- **Facets are intentionally stable** while the user narrows — `fetchFilters` re-runs on category/search change only, not on every toggle, so selecting one value never removes the other sidebar options; only the grid narrows.
-- Follow the established frontend patterns from feature 003: per-feature `types.ts` vs API-contract types in `src/types/`, `ApiResult<T>` service layer, typed `useAppDispatch`/`useAppSelector`, theme tokens in `src/styles/theme.css`, `VITE_API_URL` typed in `vite-env.d.ts`.
-- After completion run the relevant reviewers: `fyndit-api-reviewer` (API contracts/DTOs — referenced in CLAUDE.md), `fyndit-prisma-reviewer` (queries/JSON filters/aggregate), `fyndit-security-reviewer` (public-endpoint exposure), `fyndit-quality-reviewer`, `fyndit-redux-reviewer`, `fyndit-ui-reviewer` (screenshot/theme/responsive). Note from prior features: `fyndit-api-reviewer` and `fyndit-redux-reviewer` may not be registered in this environment — cover those concerns manually if so.
+- Must consult before/while implementing: `project-overview.md`, `business-rules.md`, `development-rules.md`, `database-design.md`, `prisma-schema.md`. Screenshots are the source of truth under `.claude/screenshots/`: `profile_ui.png` (page layout — left "Manage Your Profile", right "Addresses" dummy), `profile_edit_ui.png` (row in edit mode: input + green tick + accent border), `profile_edit_error_ui.png` (field error under the row + toast).
+- **Reuse, don't rebuild:** `@CurrentUser()` → `AuthenticatedUser`, `JwtAuthGuard`, `AuthService.isUserActive(userId)`, `PrismaService`, the global validation exception factory (`{ errors: { field } }` envelope), and `ValidationMessages.phoneInvalid`/`emailInvalid` all already exist from `002`. The frontend feedback model (validation → `errors`, else → `message`, `startRequest`/`failRequest` helpers) is lifted from `authSlice`/`AuthState`.
+- **No schema migration** — `is_deleted`, `deleted_at`, and all editable columns already exist on `User`. Soft delete only; never hard-delete.
+- **`/user` adds `phone`** to the profile contract (the Profile page needs it); `/auth/me`'s `UserProfile` stays as-is. Unifying the two is explicitly out of scope.
+- **Identity from the token only** — every `/user` op acts on `@CurrentUser().id`; no body/param id is trusted (prevents acting on another account). `password_hash`/internal flags must never appear in a response `select`.
+- **`isUserActive` precheck on every op** — a JWT outlives logout / soft delete, so re-verify before reading or mutating (development-rules "Special Protection").
+- Follow established patterns: per-feature `types.ts` vs API-contract types in `src/types/`, `ApiResult<T>` service layer, typed `useAppDispatch`/`useAppSelector`, theme tokens in `src/styles/theme.css`, `VITE_API_URL` typed in `vite-env.d.ts`.
+- After completion run the relevant reviewers: `fyndit-security-reviewer` (ownership/`@CurrentUser` scoping, soft-delete cookie clear), `fyndit-prisma-reviewer` (selects/`P2002` handling), `fyndit-quality-reviewer`, `fyndit-ui-reviewer` (screenshot/theme/responsive), plus `fyndit-api-reviewer` + `fyndit-redux-reviewer` (referenced in CLAUDE.md but may not be registered here — cover those concerns manually if so).
 
 ## History
 
@@ -178,3 +215,9 @@ Project CSS variables only. Discount badge + price use accent; active page / Buy
    - **`.cardBadge`** (`frontend/src/pages/Products/Products.module.css`) is now a pill — `background-color: var(--color-accent-subtle)`, accent text, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-pill)`, `white-space: nowrap`; existing font size/weight and position next to the price unchanged. `.cardPriceRow` switched `align-items: baseline` → `center` so the padded pill sits level with the price.
    - **Theme variables only** — no hardcoded colours in the module. `formatDiscountBadge`, badge text/percentage logic, API contract, Redux, routing, and the **detail page** (`.discount` in `ProductDetail.module.css`) are all untouched (out of scope) — so listing vs detail discount styling now differ by design.
    - **Verified:** frontend `npm run lint` clean and `npm run build` (tsc + vite) succeeds. Live visual confirmation against the prototype at the two breakpoints (`≤900px`, `≤540px`) still to be eyeballed on the running `:5173` (no browser-automation tooling in this environment).
+
+7. **User Module — Profile Management** — *Done* (spec `006-user-module.md`). Branch `feature/user-module` (cut from `main`). Backend `/user` module (read / update / soft-delete the authenticated user, identified via `@CurrentUser()` only) + frontend Profile page with inline per-field editing.
+   - **Backend:** new `user/` module (controller, `UserService`, `UpdateUserDto`, `types/user.types.ts`) registered in `AppModule`; imports `AuthModule` for `AuthService.isUserActive`. `GET /user` (profile incl. `phone`, via a module-level `PROFILE_SELECT` typed with `Prisma.UserGetPayload` that excludes `password_hash`/internal flags), `PATCH /user` (partial update built from only the present DTO keys — not explicit `undefined`s; `P2002` surfaced as an `{ errors: { email } }` 400 only when `error.meta.target` includes `email`, else re-thrown), `DELETE /user` (soft delete: `is_deleted`/`deleted_at`/`is_active=false` + cookie clear). Every op runs the `assertActiveUser` → `isUserActive` precheck (401 on inactive/soft-deleted); identity from the token only; `PrismaService` only; copy from a new `UserMessages` group. `AuthService.clearSessionCookie(res)` extracted (public) and reused by both `logout` and the user soft-delete. No schema migration (columns already exist).
+   - **Frontend:** `pages/Profile/` + `features/user/` (slice/service/types) mirroring the auth feedback model (`startRequest`/`failRequest`, `isValidationError` narrowing); replaces the `/profile` placeholder route; `user` reducer registered. Left "Manage Your Profile" inline-edit panel (pencil → borderless input + accent row border + green tick → confirm; Enter confirms, Esc cancels; one row at a time; field errors render under each row with reserved height so the panel never shifts); right "Addresses" dummy panel (static, `aria-hidden`, with pencil/trash chrome + dashed "Add Address" to match the screenshot). Validation → `state.errors` + "Validation Failed" toast; other failures → server `message` toast. `lucide-react` icons (`Pencil`/`Check`/`Trash2`). Shared `NetworkErrorMessages` constant added (so the offline envelope isn't borrowed from a product-namespaced message). `authSlice` reacts to `deleteUser.fulfilled` to tear down the session so the navbar can't stay "signed in". CSS Modules + theme variables only.
+   - **Reviews:** `fyndit-security-reviewer`, `fyndit-prisma-reviewer`, `fyndit-quality-reviewer`, `fyndit-ui-reviewer` run; in-scope fixes applied (P2002 `meta.target` guard, present-keys-only update payload, `deleteUser` auth teardown, address-card icon chrome, Esc-to-cancel). Deferred as out-of-scope cross-cutting refactors (pre-existing, flagged by reviewers): `ApiResult<T>` duplicated across the three services, `authSlice`'s inline `NETWORK_ERROR` not yet pointed at `NetworkErrorMessages`, and the `UserProfile` name shared by the auth (5-field) and user (6-field, +`phone`) contracts on both ends.
+   - **Verified:** backend `npm run lint`/`build`/`test` and frontend `npm run lint`/`build` all clean. Not yet exercised against a running backend in a browser (no browser-automation in this environment); the error-toast screenshot (`profile_edit_error_ui.png`) shows the old "Something went wrong" copy — the code now correctly shows "Validation Failed", so that screenshot is the stale artifact.
