@@ -1,16 +1,26 @@
 ## Current Feature
 
-**Product Browsing — Backend Product Module + Frontend Product Pages** (spec: `004-products-listing.md`)
+**Products Page UI Improvement — Discount Badge** (spec: `005-ui-improvemnt-products-page.md`)
 
-Implements end-to-end product browsing for Fyndit: a feature-isolated backend `product` module (paginated/searchable/filterable listing, category facets, single-product detail) plus the frontend product listing page, functional filter sidebar, and product preview page. Wires the navbar category links and the global search bar to the listing endpoint, and powers pagination via `react-paginate`. This is the second frontend feature and the first to consume real catalog data seeded in `001-prisma-setup.md`.
+Branch: `improvement/discount-badge-ui` (cut from `feature/products-browsing`, which carries features 003 + 004 + the access-control hardening).
+
+A small, screenshot-faithful polish on the products listing page: the per-product discount on each product card currently renders as plain accent-coloured text, but the prototype `products_page_clothing_category.png` shows it as a **badge** (soft accent-tinted pill next to the price). CSS-only presentation change — no API/data-contract/Redux/routing/logic changes; `formatDiscountBadge` and badge placement stay as-is.
 
 ## Status
 
-Done
+Spec written — implementation not started.
 
 ## Goal
 
-Deliver a production-ready, screenshot-faithful browsing experience where category navigation, search, attribute/price filtering, pagination, and product detail are all URL-driven (shareable + refresh-safe), backed by public, typed, `PrismaService`-only endpoints.
+Restyle `.cardBadge` in `frontend/src/pages/Products/Products.module.css` so the discount renders as a rounded pill (soft accent background + accent text) matching the prototype, using theme variables only (add an accent-subtle token to `theme.css` if one is missing, mirroring `--color-error-subtle`). Detail-page discount is out of scope. See `specs/005-ui-improvemnt-products-page.md` for the full Definition of Done.
+
+---
+
+## Prior Feature — Product Browsing (Backend Product Module + Frontend Product Pages) (spec: `004-products-listing.md`) — Done
+
+Implemented end-to-end product browsing for Fyndit: a feature-isolated backend `product` module (paginated/searchable/filterable listing, category facets, single-product detail) plus the frontend product listing page, functional filter sidebar, and product preview page. Wires the navbar category links and the global search bar to the listing endpoint, and powers pagination via `react-paginate`. This is the second frontend feature and the first to consume real catalog data seeded in `001-prisma-setup.md`.
+
+Goal: Deliver a production-ready, screenshot-faithful browsing experience where category navigation, search, attribute/price filtering, pagination, and product detail are all URL-driven (shareable + refresh-safe), backed by typed, `PrismaService`-only endpoints.
 
 ### Backend — `product` module (`backend/src/product/`)
 
