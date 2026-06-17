@@ -118,7 +118,8 @@
 
 .cardPriceRow {
   display: flex;
-  align-items: baseline;
+  /* Center so the padded badge pill sits level with the price baseline-text. */
+  align-items: center;
   gap: var(--space-2);
   /* Pin price to the bottom so prices align across cards of differing text. */
   margin-top: auto;
@@ -135,6 +136,10 @@
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--color-accent);
+  background-color: var(--color-accent-subtle);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
 }
 
 /* ----- Responsive ----- */
