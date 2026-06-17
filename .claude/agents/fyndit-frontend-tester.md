@@ -143,15 +143,21 @@ e2e/[feature-name].spec.ts
 
 ## Execution
 
-After writing all tests run:
+Run component and slice tests first:
 
 npx vitest run
 
-Then run:
+Then start the backend server:
+
+npm run start:dev --prefix ../backend &
+npx wait-on http://localhost:3000
+
+Then run Playwright:
 
 npx playwright test
 
 Fix every failure before finishing.
+Kill the backend server after Playwright completes.
 
 ---
 
