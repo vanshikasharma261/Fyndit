@@ -239,3 +239,21 @@ Soft Deletes Only:
 - Address
 
 Physical delete is prohibited for production data.
+
+---
+
+## JWT Session Active Re-check [user-module, product-module]
+
+A valid JWT can outlive a logout or soft-delete. Both UserService and ProductService re-check is_active via AuthService.isUserActive() before executing any business logic. UserService throws UnauthorizedException (401) on an inactive session; ProductService throws ForbiddenException (403). The difference is intentional: 401 = "not authenticated", 403 = "authenticated but session no longer permitted to browse".
+
+---
+
+## Email Conflict Surfaced as Field Error [user-module]
+
+When PATCH /user triggers a Prisma P2002 unique-constraint violation on the email column, UserService wraps it as a BadRequestException with body shape { errors: { email: "..." } } — identical to the global validation-pipe envelope — so the frontend renders it under the email form field. P2002 on any other unique field (e.g. user_name) is re-thrown unchanged.
+
+---
+
+## Frontend E2E Requires Live Backend [testing]
+
+Playwright e2e specs run against a real backend, not mocks. Execution order is fixed: run `npx vitest run` (component + slice tests) first, then start the backend with `npm run start:dev --prefix ../backend &` and block on `npx wait-on http://localhost:3000` before running `npx playwright test`. Kill the backend server after Playwright completes. Fix every failure before finishing.

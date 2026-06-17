@@ -221,3 +221,9 @@ Never expose:
 - Stripe Secret Key
 - SMTP Password
 - JWT Secret
+
+---
+
+## E2E Test Setup Pattern [user-module, product-module, auth-module]
+
+E2E specs in test/ must not import ConfigModule or the real AppModule. Instead: provide ConfigService directly via { provide: ConfigService, useValue: mockConfigService }, register JwtModule.register({ secret: TEST_SECRET }) with a fixed test secret, and mock PrismaService with jest.fn() stubs. The test/jest-e2e.json must override ts-jest tsconfig to module: CommonJS, moduleResolution: node, resolvePackageJsonExports: false so ESM .js extension imports in generated Prisma code resolve correctly. A test/tsconfig.json that extends the root tsconfig and adds types: ["jest", "node"] is required to eliminate IDE false-positive errors on describe/jest/beforeAll globals.
