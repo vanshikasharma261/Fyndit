@@ -16,6 +16,32 @@
 
 ---
 
+# Access Control & Session Rules
+
+## Authenticated-Only Application
+
+- The entire application requires an authenticated session. Every content page —
+  home, product listing, product detail, profile, orders, cart — is protected.
+- Unauthenticated visitors must never see a protected page or a partially
+  rendered/error state from a denied request. They are redirected to the login
+  page before any protected content or data fetch.
+
+## Logout
+
+- On logout the client session is fully torn down and the user is returned to
+  the login page. They cannot navigate back into protected pages while signed
+  out.
+
+## Mid-Session Expiry
+
+- A valid session can end mid-use (cookie expiry, logout in another tab, account
+  deactivation). When any authenticated request returns `401 Unauthorized`, all
+  client-side auth state must be cleared and the user redirected to the login
+  page. Auth endpoints themselves (login / signup / session-restore) are exempt:
+  their own `401`s are expected and handled in place.
+
+---
+
 # Address Rules
 
 ## Address Ownership

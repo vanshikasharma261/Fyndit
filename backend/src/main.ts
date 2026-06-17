@@ -1,13 +1,25 @@
+import { join } from 'node:path';
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
+
+  // Serve downloaded product images. The seeder stores relative paths like
+  // `/assets/products/<slug>/<color>/1.jpg`; the physical files live under
+  // `backend/assets`. The frontend prefixes these with the API origin.
+  // `dotfiles: 'deny'` so any sensitive dotfile that ever lands under the
+  // (unguarded) assets tree — `.env`, `.git`, etc. — is refused, not served.
+  app.useStaticAssets(join(__dirname, '..', 'assets'), {
+    prefix: '/assets',
+    dotfiles: 'deny',
+  });
 
   // Allow the frontend origin to send credentialed requests so the browser
   // includes and accepts the HTTP-only auth cookie on cross-origin calls.

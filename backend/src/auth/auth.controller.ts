@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
@@ -13,7 +14,7 @@ import { SignupDto } from './dto/signup.dto';
 import { LoginDto } from './dto/login.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
-import type { AuthenticatedUser } from './types/auth.types';
+import type { AuthenticatedUser, UserProfile } from './types/auth.types';
 
 /**
  * Authentication endpoints. Controllers stay thin: they validate input (via
@@ -27,6 +28,12 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   signup(@Body() dto: SignupDto): Promise<{ message: string }> {
     return this.authService.signup(dto);
+  }
+
+  @Get('me')
+  @UseGuards(JwtAuthGuard)
+  me(@CurrentUser() user: AuthenticatedUser): Promise<UserProfile> {
+    return this.authService.getProfile(user.id);
   }
 
   @Post('login')

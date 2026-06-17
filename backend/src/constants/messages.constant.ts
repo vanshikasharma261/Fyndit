@@ -14,6 +14,14 @@ export const AuthMessages = {
   // Used for bad credentials AND soft-deleted accounts to avoid enumeration.
   invalidCredentialsMessage: 'Invalid email or password',
   unauthorizedMessage: 'Authentication required',
+  // Authenticated but the account is not in an active session (logged out/soft-deleted).
+  inactiveAccountMessage: 'Your account is not active. Please log in again.',
+} as const;
+
+export const ProductMessages = {
+  productNotFound: 'Product not found',
+  invalidAttributesFilter:
+    'The attributes filter must be a JSON object mapping each attribute to an array of strings',
 } as const;
 
 export const ValidationMessages = {

@@ -1,0 +1,61 @@
+/**
+ * Fyndit design tokens — the single source of truth for theme colors and
+ * shared spacing/radius scales. Components reference these variables via CSS
+ * Modules; never hardcode theme colors.
+ */
+
+:root {
+  /* Brand */
+  --color-primary: #1a2744;
+  --color-primary-light: #243460;
+  --color-primary-dark: #111a30;
+
+  --color-accent: #ff5c35;
+  --color-accent-hover: #e64d28;
+
+  /* Surfaces */
+  --color-surface: #f1f2f4;
+  --color-surface-card: #ffffff;
+
+  /* Text */
+  --color-text: #1a1a2e;
+  --color-text-muted: #6b7280;
+
+  /* Lines */
+  --color-border: #e5e7eb;
+
+  /* Text on dark / accent surfaces */
+  --color-on-primary: #ffffff;
+  --color-on-accent: #ffffff;
+
+  /* Accent tint (soft accent-on-surface fill, e.g. discount badge) */
+  --color-accent-subtle: rgba(255, 92, 53, 0.12);
+
+  /* Feedback */
+  --color-error: #dc2626;
+  --color-success: #16a34a;
+  --color-error-subtle: rgba(220, 38, 38, 0.08);
+  --color-error-border: rgba(220, 38, 38, 0.25);
+
+  /* Accent focus ring (reused by every focusable input/button) */
+  --shadow-focus-accent: 0 0 0 3px rgba(255, 92, 53, 0.15);
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+
+  /* Radius */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+
+  /* Elevation (minimal, soft) */
+  --shadow-card: 0 10px 30px rgba(17, 26, 48, 0.08);
+}

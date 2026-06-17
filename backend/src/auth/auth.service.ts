@@ -15,7 +15,7 @@ import { ACCESS_TOKEN_COOKIE } from './constants/auth.constant';
 import { resolveCookieMaxAge } from './helpers/cookie-max-age.helper';
 import { LoginDto } from './dto/login.dto';
 import { SignupDto } from './dto/signup.dto';
-import { AuthenticatedUser, JwtPayload } from './types/auth.types';
+import { AuthenticatedUser, JwtPayload, UserProfile } from './types/auth.types';
 
 const BCRYPT_SALT_ROUNDS = 12;
 const PRISMA_UNIQUE_CONSTRAINT = 'P2002';
@@ -177,6 +177,44 @@ export class AuthService {
     res.clearCookie(ACCESS_TOKEN_COOKIE, this.buildClearCookieOptions());
 
     return { message: AuthMessages.logoutSuccessMessage };
+  }
+
+  /**
+   * Returns the current user's profile for session restore (`GET /auth/me`). A
+   * JWT can outlive a logout or soft delete, so a stale-but-valid token is
+   * rejected with 401 — the client treats that as "not signed in".
+   */
+  async getProfile(userId: string): Promise<UserProfile> {
+    const user = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+      select: {
+        user_id: true,
+        email: true,
+        first_name: true,
+        last_name: true,
+        user_name: true,
+        is_active: true,
+        is_deleted: true,
+        deleted_at: true,
+      },
+    });
+
+    if (
+      !user ||
+      !user.is_active ||
+      user.is_deleted ||
+      user.deleted_at !== null
+    ) {
+      throw new UnauthorizedException(AuthMessages.inactiveAccountMessage);
+    }
+
+    return {
+      id: user.user_id,
+      email: user.email,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      user_name: user.user_name,
+    };
   }
 
   /**
