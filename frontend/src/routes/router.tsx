@@ -5,6 +5,7 @@ import LoginPage from "../pages/Login/LoginPage";
 import SignupPage from "../pages/Signup/SignupPage";
 import ProductsPage from "../pages/Products/ProductsPage";
 import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
+import ProfilePage from "../pages/Profile/ProfilePage";
 import PlaceholderPage from "../pages/Placeholder/PlaceholderPage";
 import RequireAuth from "./RequireAuth";
 
@@ -41,7 +42,7 @@ export const router = createBrowserRouter([
           { path: "product/:category", element: <ProductsPage /> },
           // Profile/Orders/Cart land as full features later; routed now so the
           // navbar profile menu has real targets.
-          { path: "profile", element: <PlaceholderPage title="My Profile" /> },
+          { path: "profile", element: <ProfilePage /> },
           { path: "orders", element: <PlaceholderPage title="Orders" /> },
           { path: "cart", element: <PlaceholderPage title="Cart" /> },
         ],

@@ -18,6 +18,13 @@ export const AuthMessages = {
   inactiveAccountMessage: 'Your account is not active. Please log in again.',
 } as const;
 
+export const UserMessages = {
+  updateSuccess: 'Profile updated successfully',
+  deleteSuccess: 'Your account has been deleted',
+  // Surfaced as a field error on `email` when a profile email change collides.
+  emailAlreadyExists: 'An account with this email already exists',
+} as const;
+
 export const ProductMessages = {
   productNotFound: 'Product not found',
   invalidAttributesFilter:

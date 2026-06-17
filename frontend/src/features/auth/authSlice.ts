@@ -1,6 +1,7 @@
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import type { PayloadAction } from "@reduxjs/toolkit";
 import { authService } from "./authService";
+import { deleteUser } from "../user/userSlice";
 import type { AuthState } from "./types";
 import type {
   AuthErrorResponse,
@@ -227,6 +228,15 @@ const authSlice = createSlice({
         state.isAuthenticated = false;
         state.user = null;
         failRequest(state, action.payload);
+      })
+      // ----- Account soft-delete (user feature) -----
+      .addCase(deleteUser.fulfilled, (state) => {
+        // A successful DELETE /user ends the session (the backend also clears
+        // the cookie). Tear down auth state here so the navbar can't keep
+        // showing the user as signed in; the route guard then redirects.
+        state.isAuthenticated = false;
+        state.user = null;
+        state.authChecked = true;
       });
   },
 });

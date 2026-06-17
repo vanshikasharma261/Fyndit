@@ -174,9 +174,18 @@ export class AuthService {
       select: { user_id: true },
     });
 
-    res.clearCookie(ACCESS_TOKEN_COOKIE, this.buildClearCookieOptions());
+    this.clearSessionCookie(res);
 
     return { message: AuthMessages.logoutSuccessMessage };
+  }
+
+  /**
+   * Clears the auth cookie, ending the browser session. Exposed so other
+   * modules that terminate a session (e.g. account soft-delete in `UserModule`)
+   * reuse the exact cookie attributes the cookie was set with.
+   */
+  clearSessionCookie(res: Response): void {
+    res.clearCookie(ACCESS_TOKEN_COOKIE, this.buildClearCookieOptions());
   }
 
   /**
