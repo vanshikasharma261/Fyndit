@@ -28,6 +28,9 @@
   --color-on-primary: #ffffff;
   --color-on-accent: #ffffff;
 
+  /* Accent tint (soft accent-on-surface fill, e.g. discount badge) */
+  --color-accent-subtle: rgba(255, 92, 53, 0.12);
+
   /* Feedback */
   --color-error: #dc2626;
   --color-success: #16a34a;
@@ -51,6 +54,7 @@
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 16px;
+  --radius-pill: 999px;
 
   /* Elevation (minimal, soft) */
   --shadow-card: 0 10px 30px rgba(17, 26, 48, 0.08);

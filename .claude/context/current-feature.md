@@ -8,11 +8,19 @@ A small, screenshot-faithful polish on the products listing page: the per-produc
 
 ## Status
 
-Spec written — implementation not started.
+Done.
 
 ## Goal
 
 Restyle `.cardBadge` in `frontend/src/pages/Products/Products.module.css` so the discount renders as a rounded pill (soft accent background + accent text) matching the prototype, using theme variables only (add an accent-subtle token to `theme.css` if one is missing, mirroring `--color-error-subtle`). Detail-page discount is out of scope. See `specs/005-ui-improvemnt-products-page.md` for the full Definition of Done.
+
+## Implementation
+
+- Added two theme tokens to `frontend/src/styles/theme.css`: `--color-accent-subtle: rgba(255, 92, 53, 0.12)` (soft accent fill, mirroring the `--color-error-subtle` convention) and `--radius-pill: 999px`.
+- `.cardBadge` in `Products.module.css` is now a pill: `background-color: var(--color-accent-subtle)`, accent text, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-pill)`, `white-space: nowrap`. Existing font size/weight and position next to the price are unchanged.
+- `.cardPriceRow` switched from `align-items: baseline` to `center` so the padded pill sits level with the price.
+- Theme variables only — no hardcoded colours in the module. `formatDiscountBadge`, badge text/percentage logic, API contract, Redux, routing, and the detail page are all untouched (out of scope).
+- Verified: `frontend` `npm run lint` clean and `npm run build` (tsc + vite) succeeds. Visual confirmation against the prototype at the running dev server still to be eyeballed.
 
 ---
 
@@ -164,3 +172,9 @@ Project CSS variables only. Discount badge + price use accent; active page / Buy
    - **Logout** already redirected to `/login`; the guard now also blocks navigating back into protected pages while signed out.
    - **Sticky filter sidebar:** `FilterSidebar` `.sidebar` is now `position: sticky; top: 5rem` (clears the ~4rem sticky navbar) with `max-height: calc(100dvh - 6rem)` + `overflow-y: auto` + `overscroll-behavior: contain`, so filters stay in view while the grid scrolls and tall scopes (e.g. Electronics) scroll internally to reach the last attribute group. Scrollbar is **slim + hover-revealed** (thumb transparent until hover/focus; `scrollbar-width: thin` + styled `::-webkit-scrollbar`) — chosen over a fully hidden bar so the bottom filter stays discoverable/draggable. Card split into a `.sidebar` shell (pinned, `overflow: hidden`, rounded) + inner `.scroll` container; a **bouncing down-chevron hint** (`scrollHint`) fades in at the bottom edge while more content is below and hides at the bottom — state tracked in `FilterSidebar` via a `scroll` listener + `ResizeObserver` (deps `[filters, loading]`; `setCanScrollDown` only fires inside callbacks, clear of the `set-state-in-effect` rule). Reverts to static at the `≤900px` breakpoint where the sidebar stacks above the grid. Verified no ancestor `overflow` would break sticky (`.shell`/`.content` are plain flex).
    - **Verified:** frontend `npm run build` (tsc + vite) and `npm run lint` clean. Sticky prerequisites verified statically; not yet eyeballed in a browser (no browser-automation tooling in this environment) — visual scroll + the logout/401 redirect flow to be confirmed against the running `:5173`/`:3000` instances.
+
+6. **Products Page UI Improvement — Discount Badge** — *Done* (spec `005-ui-improvemnt-products-page.md`). Branch `improvement/discount-badge-ui` (cut from `feature/products-browsing`). Small, screenshot-faithful polish: the per-product discount on the listing card rendered as plain accent-coloured text; the prototype `products_page_clothing_category.png` shows it as a pill badge. CSS-only.
+   - **Theme tokens added** (`frontend/src/styles/theme.css`): `--color-accent-subtle: rgba(255, 92, 53, 0.12)` (soft accent fill, mirroring the existing `--color-error-subtle` convention) and `--radius-pill: 999px`.
+   - **`.cardBadge`** (`frontend/src/pages/Products/Products.module.css`) is now a pill — `background-color: var(--color-accent-subtle)`, accent text, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-pill)`, `white-space: nowrap`; existing font size/weight and position next to the price unchanged. `.cardPriceRow` switched `align-items: baseline` → `center` so the padded pill sits level with the price.
+   - **Theme variables only** — no hardcoded colours in the module. `formatDiscountBadge`, badge text/percentage logic, API contract, Redux, routing, and the **detail page** (`.discount` in `ProductDetail.module.css`) are all untouched (out of scope) — so listing vs detail discount styling now differ by design.
+   - **Verified:** frontend `npm run lint` clean and `npm run build` (tsc + vite) succeeds. Live visual confirmation against the prototype at the two breakpoints (`≤900px`, `≤540px`) still to be eyeballed on the running `:5173` (no browser-automation tooling in this environment).
