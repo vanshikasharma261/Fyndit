@@ -136,6 +136,34 @@ Fix every failure before finishing.
 
 ---
 
+## Context Self-Improvement
+
+After all tests pass, reflect on what you discovered during this task.
+
+Ask yourself:
+
+- Did I find a business rule not documented in business-rules.md?
+- Did I find a pattern (mock setup, test structure) worth reusing?
+- Did I find a guard or ownership behavior not yet in development-rules.md?
+- Did I establish a new testing convention others should follow?
+
+If yes to any:
+
+1. Open the relevant context file
+2. Append only the new finding — do not rewrite existing content
+3. Keep it concise — one rule, one pattern, one paragraph max per finding
+4. Tag it with the feature name so it is traceable
+
+-- Example append to testing-patterns.md:
+
+## Cart Service Mock Setup [cart-feature]
+
+PrismaService mock for cart tests requires both
+findUnique (returns cart with items) and update (returns updated cart).
+Use this shape for all cart-related service tests.
+
+Do not update context if nothing genuinely new was discovered.
+
 ## Output Format
 
 Backend Test Report — [Feature Name]
