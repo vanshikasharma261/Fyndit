@@ -23,33 +23,25 @@ The goal is to create a professional full-stack e-commerce platform similar to m
 
 # Users
 
-## Guest User
+Fyndit is an authenticated-only application. There is no guest browsing — every
+content page (homepage, listing, detail, cart, checkout, orders, profile)
+requires a signed-in session. Unauthenticated visitors are redirected to login
+before any protected page renders or any data fetch runs.
 
-Can:
-
-- Browse homepage
-- Browse categories
-- Search products
-- View product details
-
-Cannot:
-
-- Add to cart
-- Checkout
-- View orders
-
----
-
-## Registered User
+## Authenticated User
 
 Can:
 
 - Login / Logout
+- Browse homepage
+- Browse categories
+- Search products
+- View product details
 - Manage profile
 - Manage addresses
-- Add products to cart
-- Checkout
-- Apply coupons
+- Add to cart / update quantity / remove items
+- Apply / remove coupons
+- Checkout (Cash on Delivery or Stripe card)
 - Place orders
 - View order history
 - Cancel eligible orders
@@ -406,23 +398,36 @@ Related Products
 
 ## Cart Page
 
-Cart Items
+Reference: screenshots/cart_ui.png
 
-Coupon Section
-
-Order Summary
-
-Checkout Button
+- Cart Items list
+- Cart Summary (shown before any coupon is applied)
+- Checkout Button
 
 ---
 
 ## Checkout Page
 
-Address Selection
+References:
+- screenshots/checkout_cod_ui.png — Cash on Delivery flow
+- screenshots/checkout_stripe_ui.png — Stripe card payment flow
 
-Payment Selection
+The user moves to checkout to:
 
-Order Summary
+- Select a delivery address
+- Select a payment option (Cash on Delivery or Stripe card)
+- Review the Checkout Summary
+
+Checkout Summary includes:
+
+- Subtotal
+- Coupon discount
+- Shipping fee
+- Final total
+
+Coupon application happens on this page, before any payment is made: the user
+can apply a valid coupon (the discount is reflected in the summary) and remove
+it again before placing the order.
 
 Place Order Button
 

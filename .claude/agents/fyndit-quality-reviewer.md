@@ -111,6 +111,17 @@ Check:
 - Shared utilities used
 - Existing components reused
 
+### API Contracts
+
+Check:
+
+- Response shapes are consistent across endpoints
+- Money serialized as "0.00" strings (never raw Decimal/float)
+- Validation errors use the { errors: { field } } envelope consistently
+- Pagination responses share the same meta shape (page, limit, total, total_pages)
+- Correct HTTP status codes (201 create, 400 bad input, 401, 403, 404, 409)
+- Consistent field naming across endpoints
+
 ---
 
 ## Output Format
