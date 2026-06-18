@@ -115,6 +115,7 @@ Pagination required for:
 
 - Products
 - Orders
+- Cart Items
 
 Use:
 

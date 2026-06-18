@@ -101,6 +101,9 @@ Stock can never be negative.
 Out-of-stock variants:
 
 - Cannot be added to cart.
+- At checkout, an out-of-stock item is excluded from the final order summary
+  (its subtotal is not counted toward the total), and the item is shown with an
+  "Out of Stock" overlay on the checkout page.
 - Cannot be purchased.
 
 ---
