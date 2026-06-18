@@ -12,6 +12,11 @@ dist
 dist-ssr
 *.local
 
+# Test / coverage output
+coverage
+test-results
+playwright-report
+
 # dotenv environment variable files
 .env
 .env.development.local

@@ -78,6 +78,8 @@ Required for:
 - Inventory Reduction
 - Stripe Confirmation
 - Refunds
+- Cart add-to-cart — the count/stock-bounded `upsert` runs in a Serializable
+  `$transaction` so concurrent adds can't breach the 25-line / per-line caps
 
 Use:
 
@@ -130,6 +132,11 @@ Create indexes for:
 - Foreign Keys
 - Search Fields
 - Frequently Filtered Columns
+
+`CartItem` carries a composite unique `@@unique([cart_id, product_variant_id])`
+(one line per variant per cart). It enables the atomic add-to-cart `upsert` via
+the generated `cart_id_product_variant_id` key and prevents duplicate lines.
+Added in migration `cart_item_unique_variant`.
 
 ---
 

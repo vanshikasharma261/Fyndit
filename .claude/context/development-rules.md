@@ -115,7 +115,6 @@ Pagination required for:
 
 - Products
 - Orders
-- Cart Items
 
 Use:
 
@@ -124,6 +123,10 @@ skip
 cursor
 
 No full table scans.
+
+The **cart is the exception**: it is returned whole (no pagination), bounded
+instead by the 25 distinct-line cap (`MAX_CART_ITEMS`). The summary is computed
+over all lines; the bounded size keeps the query cheap.
 
 ---
 
@@ -228,3 +231,11 @@ Never expose:
 ## E2E Test Setup Pattern [user-module, product-module, auth-module]
 
 E2E specs in test/ must not import ConfigModule or the real AppModule. Instead: provide ConfigService directly via { provide: ConfigService, useValue: mockConfigService }, register JwtModule.register({ secret: TEST_SECRET }) with a fixed test secret, and mock PrismaService with jest.fn() stubs. The test/jest-e2e.json must override ts-jest tsconfig to module: CommonJS, moduleResolution: node, resolvePackageJsonExports: false so ESM .js extension imports in generated Prisma code resolve correctly. A test/tsconfig.json that extends the root tsconfig and adds types: ["jest", "node"] is required to eliminate IDE false-positive errors on describe/jest/beforeAll globals.
+
+---
+
+## Cart Write Patterns [cart-module]
+
+- **Add to cart** is an atomic `upsert` on the `CartItem` compound unique key `@@unique([cart_id, product_variant_id])` (Prisma generated key `cart_id_product_variant_id`): create at quantity 1, otherwise `{ quantity: { increment: 1 } }`. The read → count/stock check → upsert runs inside `prisma.$transaction(cb, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })` so concurrent adds cannot breach the 25-line cap (`MAX_CART_ITEMS`) or the per-line quantity ceiling (`MAX_CART_ITEM_QUANTITY`).
+- **Update / remove** scope the write by `cart_id` as well as `cart_item_id` using `updateMany` / `deleteMany`, and treat a `count === 0` result as a 404. This is both the ownership check (a user can only touch their own line) and a guard against a Prisma `P2025` (record-not-found) surfacing as a 500 when a line is removed mid-request.
+- Identity is always `@CurrentUser().id`; no cart or cart-item id is ever trusted from the body/params to establish ownership. Every cart op runs the `assertActiveUser` precheck (401) before any DB access.

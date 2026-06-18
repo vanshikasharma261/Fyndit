@@ -6,6 +6,7 @@ import SignupPage from "../pages/Signup/SignupPage";
 import ProductsPage from "../pages/Products/ProductsPage";
 import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
 import ProfilePage from "../pages/Profile/ProfilePage";
+import CartPage from "../pages/Cart/CartPage";
 import PlaceholderPage from "../pages/Placeholder/PlaceholderPage";
 import RequireAuth from "./RequireAuth";
 
@@ -44,7 +45,7 @@ export const router = createBrowserRouter([
           // navbar profile menu has real targets.
           { path: "profile", element: <ProfilePage /> },
           { path: "orders", element: <PlaceholderPage title="Orders" /> },
-          { path: "cart", element: <PlaceholderPage title="Cart" /> },
+          { path: "cart", element: <CartPage /> },
         ],
       },
     ],

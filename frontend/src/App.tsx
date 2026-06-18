@@ -1,5 +1,7 @@
 import { useEffect } from "react";
 import { RouterProvider } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 import { useAppDispatch } from "./store/hooks";
 import { fetchCurrentUser } from "./features/auth/authSlice";
 import { router } from "./routes/router";
@@ -14,7 +16,13 @@ function App() {
     void dispatch(fetchCurrentUser());
   }, [dispatch]);
 
-  return <RouterProvider router={router} />;
+  return (
+    <>
+      <RouterProvider router={router} />
+      {/* Colored theme → success toasts are green, error toasts are red. */}
+      <ToastContainer position="top-right" autoClose={3000} theme="colored" />
+    </>
+  );
 }
 
 export default App;

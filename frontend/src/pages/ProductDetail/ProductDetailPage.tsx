@@ -5,10 +5,13 @@ import {
   clearProductDetail,
   fetchProductDetail,
 } from "../../features/products/productsSlice";
+import { toast } from "react-toastify";
+import { addToCart } from "../../features/cart/cartSlice";
 import { resolveImageUrl } from "../../utils/image";
-import { ProductMessages } from "../../constants/messages.constant";
+import { CartMessages, ProductMessages } from "../../constants/messages.constant";
 import { formatDiscountBadge, formatPrice, titleCase } from "../../utils/format";
 import type { ProductVariantDetail } from "../../types/product.types";
+import type { CartErrorResponse } from "../../types/cart.types";
 import styles from "./ProductDetail.module.css";
 
 /** Does a variant satisfy every currently selected attribute value? */
@@ -28,6 +31,7 @@ function ProductDetailPage() {
   const { detail, detailLoading, detailError } = useAppSelector(
     (state) => state.products,
   );
+  const adding = useAppSelector((state) => state.cart.adding);
 
   const [selected, setSelected] = useState<Record<string, string>>({});
   const [imageIndex, setImageIndex] = useState(0);
@@ -91,6 +95,19 @@ function ProductDetailPage() {
       if (fallback) setSelected(fallback.attributes);
     }
     setImageIndex(0);
+  };
+
+  const handleAddToCart = async () => {
+    if (!selectedVariant) return;
+    try {
+      // The server validates stock/availability; a green toast on success, a
+      // red toast with the server message on failure (out of stock, etc.).
+      await dispatch(addToCart(selectedVariant.product_variant_id)).unwrap();
+      toast.success(CartMessages.addSuccess);
+    } catch (rejected) {
+      const payload = rejected as CartErrorResponse | undefined;
+      toast.error(payload?.message ?? CartMessages.genericError);
+    }
   };
 
   if (detailLoading) {
@@ -209,10 +226,16 @@ function ProductDetailPage() {
           </p>
 
           <div className={styles.actions}>
-            <button type="button" className={styles.addToCart} disabled={!inStock}>
+            <button
+              type="button"
+              className={styles.addToCart}
+              disabled={adding}
+              onClick={handleAddToCart}
+            >
               Add to Cart
             </button>
-            <button type="button" className={styles.buy} disabled={!inStock}>
+            {/* Buy is not wired yet — clickable but inert for now. */}
+            <button type="button" className={styles.buy}>
               Buy
             </button>
           </div>

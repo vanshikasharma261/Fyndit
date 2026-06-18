@@ -36,6 +36,7 @@
   --color-success: #16a34a;
   --color-error-subtle: rgba(220, 38, 38, 0.08);
   --color-error-border: rgba(220, 38, 38, 0.25);
+  --color-success-subtle: rgba(22, 163, 74, 0.12);
 
   /* Accent focus ring (reused by every focusable input/button) */
   --shadow-focus-accent: 0 0 0 3px rgba(255, 92, 53, 0.15);
