@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import type { ChangeEvent, KeyboardEvent } from "react";
-import { Check, Pencil, Trash2 } from "lucide-react";
+import { Check, Pencil } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   clearUserFeedback,
   fetchUser,
   updateUser,
 } from "../../features/user/userSlice";
-import { UserMessages } from "../../constants/messages.constant";
+import { AddressMessages, UserMessages } from "../../constants/messages.constant";
+import AddressesPanel from "../../components/Addresses/AddressesPanel";
 import type { EditableField, UserProfile } from "../../types/user.types";
 import styles from "./Profile.module.css";
 
@@ -22,9 +23,11 @@ const PROFILE_FIELDS: { field: EditableField; label: string }[] = [
 
 /**
  * Profile page. Left "Manage Your Profile" panel with per-row inline editing
- * (pencil → input + green tick → confirm); right "Addresses" panel is a static
- * placeholder until the address feature ships. Matches `profile_ui.png`,
- * `profile_edit_ui.png` and `profile_edit_error_ui.png`.
+ * (pencil → input + green tick → confirm); right panel renders the live
+ * `<AddressesPanel/>` (list ⇄ add/edit form — add, edit, remove, set default).
+ * Matches `profile_ui.png`, `profile_edit_ui.png`, `profile_edit_error_ui.png`,
+ * `address_add_form_ui.png`, `address_update_form_ui.png`, and
+ * `validation_error_address_update.png`.
  */
 function ProfilePage() {
   const dispatch = useAppDispatch();
@@ -178,41 +181,10 @@ function ProfilePage() {
           )}
         </section>
 
-        {/* ----- Addresses (placeholder until the address feature ships) ----- */}
+        {/* ----- Addresses (live: list ⇄ add/edit form) ----- */}
         <section className={styles.card}>
-          <h2 className={styles.heading}>Addresses</h2>
-
-          <div className={styles.addressCard} aria-hidden="true">
-            <div className={styles.addressTop}>
-              <span className={styles.addressBadge}>Work Address</span>
-              <div className={styles.addressActions}>
-                <Pencil size={16} strokeWidth={2} />
-                <Trash2 size={16} strokeWidth={2} />
-              </div>
-            </div>
-            <p className={styles.addressLine1}>#120-D</p>
-            <p className={styles.addressLine2}>Sarojni Colony, Model Town</p>
-
-            <div className={styles.addressMeta}>
-              <div className={styles.addressMetaCol}>
-                <span className={styles.addressMetaLabel}>City</span>
-                <span className={styles.addressMetaValue}>Yamuna Nagar</span>
-              </div>
-              <div className={styles.addressMetaCol}>
-                <span className={styles.addressMetaLabel}>State</span>
-                <span className={styles.addressMetaValue}>Haryana</span>
-              </div>
-              <span className={styles.zipChip}>Zip Code: 135001</span>
-            </div>
-          </div>
-
-          <div className={styles.addAddress} aria-hidden="true">
-            Add Address
-          </div>
-
-          <p className={styles.addressNote}>
-            Address management is coming soon.
-          </p>
+          <h2 className={styles.heading}>{AddressMessages.heading}</h2>
+          <AddressesPanel />
         </section>
       </div>
     </div>

@@ -56,9 +56,26 @@ Accessing another user's address is forbidden.
 
 ## Address Limits
 
-- Maximum 5 active addresses per user.
-- Deleted addresses are soft deleted.
-- Removed addresses must not appear in address listings.
+- Maximum 5 active addresses per user (`MAX_ACTIVE_ADDRESSES` in
+  `values.constant.ts`). The backend rejects a 6th with a 400; the frontend also
+  hides "Add Address" at 5.
+- Deleted addresses are soft deleted (`is_removed = true` + `removed_at = now()`
+  + `is_default = false`); never hard-deleted.
+- Removed addresses must not appear in address listings and do not count toward
+  the 5-address limit.
+
+## Default Address
+
+- Exactly one default (`is_default = true`) exists per user whenever they have
+  ≥1 active address — an invariant enforced inside Serializable transactions.
+- The first address a user adds (including the signup address) is automatically
+  the default.
+- Any active address can be made default via `PATCH /address/:addressId/default`;
+  setting a new default unsets the previous one in the same transaction.
+- Removing the current default auto-promotes the most-recently-created remaining
+  active address to default (same transaction).
+- `is_default` is never accepted from a create/update DTO — it changes only via
+  the dedicated set-default endpoint or the auto-default/auto-promote rules.
 
 ## Address Types
 
@@ -259,9 +276,9 @@ Physical delete is prohibited for production data.
 
 ---
 
-## JWT Session Active Re-check [user-module, product-module]
+## JWT Session Active Re-check [user-module, product-module, cart-module, address-module]
 
-A valid JWT can outlive a logout or soft-delete. Both UserService and ProductService re-check is_active via AuthService.isUserActive() before executing any business logic. UserService throws UnauthorizedException (401) on an inactive session; ProductService throws ForbiddenException (403). The difference is intentional: 401 = "not authenticated", 403 = "authenticated but session no longer permitted to browse".
+A valid JWT can outlive a logout or soft-delete. UserService, ProductService, CartService, and AddressService re-check is_active via AuthService.isUserActive() (the shared `assertActiveUser(userId)` precheck) before executing any business logic. UserService, CartService, and AddressService throw UnauthorizedException (401) on an inactive session; ProductService throws ForbiddenException (403). The difference is intentional: 401 = "not authenticated", 403 = "authenticated but session no longer permitted to browse".
 
 ---
 

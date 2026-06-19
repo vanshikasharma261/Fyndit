@@ -86,6 +86,10 @@ export class AuthService {
             country: dto.country,
             zip: dto.zip,
             address_type: dto.address_type ?? AddressType.HOME,
+            // First and only address at signup — keep the "exactly one default
+            // per user" invariant true from account creation onward.
+            is_default: true,
+            is_removed: false,
           },
           select: { address_id: true },
         });

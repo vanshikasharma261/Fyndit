@@ -109,3 +109,80 @@ mockPrisma.$transaction = jest.fn((callback) => callback(mockTx));
 ```
 
 Re-apply this implementation in `beforeEach` after `jest.clearAllMocks()` resets it. Inside transaction tests, assert on `mockTx.cartItem.*` (not `mockPrisma.cartItem.*`) for the inner ops, and assert on `mockPrisma.productVariant.findUnique` for any lookup that runs outside the transaction. This makes it possible to verify both the transaction boundary and the individual inner calls.
+
+---
+
+## resetAllMocks vs clearAllMocks When Using mockResolvedValueOnce Across Tests [address-module]
+
+`jest.clearAllMocks()` clears call counts and results but does NOT drain `mockResolvedValueOnce` return-value queues. If a test queues two `mockResolvedValueOnce` values on a shared `mockTx` stub but the service only consumes one (because a branch is not taken), the second value leaks into the next test despite `clearAllMocks()` in `beforeEach`. The symptom is a NotFoundException (or unexpected truthy/falsy mock return) in a test that sets up the correct mocks, caused by the stale queued value being consumed first.
+
+Fix: use `jest.resetAllMocks()` in the outer `beforeEach` instead of `clearAllMocks()`. `resetAllMocks()` also drains `Once` queues. Since it also removes any `mockImplementation()`, re-apply `mockPrisma.$transaction.mockImplementation(...)` immediately after — exactly the pattern already used in cart.service.spec.ts for `$transaction`. This distinction matters whenever multiple tests in a describe block use `mockResolvedValueOnce` on the same shared stub object and not all queued values are guaranteed to be consumed.
+
+---
+
+## Playwright /cart Mock Required in All Profile Page Tests [address-feature]
+
+`MainLayout` dispatches `fetchCart` on every authenticated mount. In Playwright tests that mock `/auth/me` as 200 but use no real session cookie, the live backend returns 401 for `GET /cart`, which fires `authExpiryMiddleware` → `sessionExpired` → redirect to `/login`. Every `setupAuthenticatedSession` helper used in profile-page e2e tests must therefore also mock `GET /cart` (returning an empty cart) to prevent this session-expiry redirect. This applies to any page rendered inside `MainLayout` that mounts without a real cookie.
+
+---
+
+## Playwright Strict Mode Locator for "Default" Badge [address-feature]
+
+The "Default" badge text on an address card conflicts with the "Set as default" button in strict locator mode: `page.getByText("Default")` matches both the badge `<span>` and the button element (which contains "default" as a substring). Use `page.getByText("Default", { exact: true }).first()` to scope the assertion to the badge only. The `{ exact: true }` flag matches whole text content, not substrings, so "Set as default" is excluded.
+
+---
+
+## renderWithProviders Must Include address Reducer [address-feature]
+
+`src/test/renderWithProviders.tsx` must register the `address` reducer (from `features/address/addressSlice`) alongside `auth`, `products`, `user`, and `cart`. Without it, any component that calls `useAppSelector((state) => state.address)` — such as `AddressesPanel` — throws during rendering in unit tests. The reducer was added in this pass; all subsequent tests that render `AddressesPanel` or `ProfilePage` will use the updated helper automatically.
+
+---
+
+## Type Supertest `res.body` to the Response Contract [address-module]
+
+The backend ESLint config is type-checked (`recommendedTypeChecked`), so accessing `res.body.x` directly trips `@typescript-eslint/no-unsafe-member-access` / `no-unsafe-assignment` because supertest types `.body` as `any`. In e2e specs, cast `res.body` to the real response contract before reading it — reuse the module's exported types rather than inventing shapes:
+
+```ts
+const body = res.body as AddressResponse[];          // list endpoints
+const body = res.body as AddressResponse;            // single resource
+const body = res.body as { message: string };        // message / error envelope
+const body = res.body as { errors: Record<string, string> }; // validation envelope
+```
+
+Apply the same casting to `any`-typed locals in service unit specs (e.g. `const calls = mockFn.mock.calls as Array<[{ where: ... }]>` before indexing `calls[0][0]`). Never reach for `eslint-disable` — type it.
+
+---
+
+## Asymmetric-Matcher Wrappers to Satisfy no-unsafe-assignment [address-module]
+
+`expect.objectContaining(...)` and `expect.any(...)` return `any`, which trips `no-unsafe-assignment` when nested as a property value inside another matcher object. Define thin wrappers that re-type the result as `unknown` (behavior-identical — they just forward to the real matcher):
+
+```ts
+const containing = (obj: object): unknown => expect.objectContaining(obj);
+const anyOf = (ctor: unknown): unknown => expect.any(ctor);
+
+expect(mockTx.address.create).toHaveBeenCalledWith(
+  expect.objectContaining({ data: containing({ is_default: true }) }),
+);
+```
+
+`unknown` is still accepted by `toHaveBeenCalledWith` / `toMatchObject` (their params are `any[]`) but is not flagged. Used in `address.service.spec.ts`, `address.e2e-spec.ts`, `cart.e2e-spec.ts`.
+
+---
+
+## ESLint `^_`-Prefixed Unused-Var Convention [address-module]
+
+The backend ESLint config sets `@typescript-eslint/no-unused-vars` with `argsIgnorePattern` / `varsIgnorePattern` / `caughtErrorsIgnorePattern: '^_'`. Prefix deliberately-unused bindings with `_` to signal intent and pass lint — e.g. omit-destructures in e2e specs that build a payload missing a required field:
+
+```ts
+const { address_type: _omitted, ...payload } = validAddressPayload();
+await request(app.getHttpServer()).post('/address').send(payload); // missing field
+```
+
+Also applies to ignored catch params (`catch (_e)`).
+
+---
+
+## Assert Ownership-Scoped Writes as `updateMany`, Not `update` [address-module]
+
+Service methods that mutate user-owned resources use ownership-scoped `updateMany` (scoped by `{ id, user_id, is_removed: false }`, `count === 0` → 404) — never bare `update` (which would surface a foreign id as a Prisma `P2025`/500). Unit specs must therefore assert on `mockTx.address.updateMany` (or `mockPrisma.*.updateMany`), and the `mockTx` model stub must include **every** method the transaction calls — including `findMany` when the method builds its refreshed response list inside the same `$transaction` (e.g. set-default returns the in-tx list). A stale spec asserting `update`, or a `mockTx` missing `findMany`, fails even though the implementation is correct.

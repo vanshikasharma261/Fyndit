@@ -44,13 +44,17 @@ user_id
 
 # Soft Deletes
 
+Each soft-deleted model uses a boolean flag + a timestamp:
+
 User
 
-deleted_at
+- is_deleted Boolean @default(false)
+- deleted_at DateTime?
 
 Address
 
-removed_at
+- is_removed Boolean @default(false)
+- removed_at DateTime?
 
 No physical deletion.
 
@@ -241,6 +245,13 @@ zip String
 
 address_type AddressType
 
+// Exactly one default per user while they have >=1 active address.
+is_default Boolean @default(false)
+
+// Soft delete: is_removed is the flag, removed_at the timestamp (mirrors
+// User's is_deleted/deleted_at). Removed rows never list and don't count
+// toward the 5-active-address limit.
+is_removed Boolean   @default(false)
 removed_at DateTime?
 
 created_at DateTime @default(now())
@@ -252,6 +263,12 @@ orders Order[]
 
 @@index([user_id])
 }
+
+> The `is_default` / `is_removed` columns were added in migration
+> `address_is_removed_is_default`. The existing `@@index([user_id])` covers the
+> `{ user_id, is_removed: false }` list query at current row counts; a composite
+> `@@index([user_id, is_removed])` is a deferred optimization (reconsider if the
+> active-scope query becomes hot).
 
 model Cart {
 cart_id String @id @default(uuid()) @db.Uuid
