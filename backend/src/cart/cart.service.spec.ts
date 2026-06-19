@@ -28,7 +28,10 @@ import { CartService } from './cart.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuthService } from '../auth/auth.service';
 import { CartMessages, AuthMessages } from '../constants/messages.constant';
-import { MAX_CART_ITEMS, MAX_CART_ITEM_QUANTITY } from '../constants/values.constant';
+import {
+  MAX_CART_ITEMS,
+  MAX_CART_ITEM_QUANTITY,
+} from '../constants/values.constant';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 
@@ -107,16 +110,18 @@ const VARIANT_ID = 'var-001';
  * Builds a full CART_ITEM_SELECT row using real Prisma.Decimal values so the
  * service's `computeSummary` and `toCartItem` can do their real arithmetic.
  */
-function makeCartItemRow(overrides: {
-  cart_item_id?: string;
-  product_variant_id?: string;
-  quantity?: number;
-  stock?: number;
-  price?: number;
-  discount?: number;
-  images?: { image_url: string; is_primary: boolean; sort_order: number }[];
-  attributes?: unknown;
-} = {}) {
+function makeCartItemRow(
+  overrides: {
+    cart_item_id?: string;
+    product_variant_id?: string;
+    quantity?: number;
+    stock?: number;
+    price?: number;
+    discount?: number;
+    images?: { image_url: string; is_primary: boolean; sort_order: number }[];
+    attributes?: unknown;
+  } = {},
+) {
   return {
     cart_item_id: overrides.cart_item_id ?? ITEM_ID,
     product_variant_id: overrides.product_variant_id ?? VARIANT_ID,
@@ -154,6 +159,19 @@ function makeSummaryRow(quantity: number, price: number, discount: number) {
     },
   };
 }
+
+// ---------------------------------------------------------------------------
+// Matcher helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Thin wrappers over jest's asymmetric matchers. The built-in `expect.*`
+ * matchers are typed as `any`, which trips `no-unsafe-assignment` when nested
+ * as a property value. Re-typing the result as `unknown` keeps behavior
+ * identical while satisfying the type checker.
+ */
+const containing = (obj: object): unknown => expect.objectContaining(obj);
+const anyOf = (ctor: unknown): unknown => expect.any(ctor);
 
 // ---------------------------------------------------------------------------
 // Test suite
@@ -289,8 +307,19 @@ describe('CartService', () => {
     it('computes total_items as the sum of all line quantities', async () => {
       mockPrisma.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
       mockPrisma.cartItem.findMany.mockResolvedValue([
-        makeCartItemRow({ cart_item_id: 'i1', quantity: 3, price: 500, discount: 0 }),
-        makeCartItemRow({ cart_item_id: 'i2', product_variant_id: 'var-002', quantity: 2, price: 200, discount: 0 }),
+        makeCartItemRow({
+          cart_item_id: 'i1',
+          quantity: 3,
+          price: 500,
+          discount: 0,
+        }),
+        makeCartItemRow({
+          cart_item_id: 'i2',
+          product_variant_id: 'var-002',
+          quantity: 2,
+          price: 200,
+          discount: 0,
+        }),
       ]);
 
       const result = await service.getCart(USER_ID);
@@ -303,8 +332,19 @@ describe('CartService', () => {
       // totals: total_price=1600, total_discount=100, final_amount=1500
       mockPrisma.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
       mockPrisma.cartItem.findMany.mockResolvedValue([
-        makeCartItemRow({ cart_item_id: 'i1', quantity: 2, price: 500, discount: 50 }),
-        makeCartItemRow({ cart_item_id: 'i2', product_variant_id: 'var-002', quantity: 3, price: 200, discount: 0 }),
+        makeCartItemRow({
+          cart_item_id: 'i1',
+          quantity: 2,
+          price: 500,
+          discount: 50,
+        }),
+        makeCartItemRow({
+          cart_item_id: 'i2',
+          product_variant_id: 'var-002',
+          quantity: 3,
+          price: 200,
+          discount: 0,
+        }),
       ]);
 
       const result = await service.getCart(USER_ID);
@@ -333,7 +373,11 @@ describe('CartService', () => {
       mockPrisma.cartItem.findMany.mockResolvedValue([
         makeCartItemRow({
           images: [
-            { image_url: '/img/secondary.jpg', is_primary: false, sort_order: 1 },
+            {
+              image_url: '/img/secondary.jpg',
+              is_primary: false,
+              sort_order: 1,
+            },
             { image_url: '/img/primary.jpg', is_primary: true, sort_order: 99 },
           ],
         }),
@@ -376,7 +420,10 @@ describe('CartService', () => {
       ]);
 
       const result = await service.getCart(USER_ID);
-      expect(result.items[0].attributes).toEqual({ color: 'Silver', ram: '16GB' });
+      expect(result.items[0].attributes).toEqual({
+        color: 'Silver',
+        ram: '16GB',
+      });
     });
 
     it('returns empty attributes record when variant attributes is null', async () => {
@@ -433,15 +480,17 @@ describe('CartService', () => {
       });
       mockTx.cartItem.findUnique.mockResolvedValue(null); // no existing line
       mockTx.cartItem.count.mockResolvedValue(0);
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: 1 }));
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: 1 }),
+      );
       seedSummaryFindMany(1, 1100, 77);
 
       const result = await service.addToCart(USER_ID, dto);
 
       expect(mockTx.cartItem.upsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          create: expect.objectContaining({ quantity: 1 }),
-          update: expect.objectContaining({ quantity: { increment: 1 } }),
+          create: containing({ quantity: 1 }),
+          update: containing({ quantity: { increment: 1 } }),
         }),
       );
       expect(result.item.quantity).toBe(1);
@@ -453,14 +502,17 @@ describe('CartService', () => {
         product: { is_active: true },
       });
       mockTx.cartItem.findUnique.mockResolvedValue({ quantity: 3 }); // existing
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: 4 }));
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: 4 }),
+      );
       seedSummaryFindMany(4, 1100, 77);
 
       const result = await service.addToCart(USER_ID, dto);
 
-      const upsertCall = mockTx.cartItem.upsert.mock.calls[0][0] as {
-        update: { quantity: { increment: number } };
-      };
+      const upsertCalls = mockTx.cartItem.upsert.mock.calls as Array<
+        [{ update: { quantity: { increment: number } } }]
+      >;
+      const upsertCall = upsertCalls[0][0];
       expect(upsertCall.update.quantity.increment).toBe(1);
       expect(result.item.quantity).toBe(4);
     });
@@ -472,7 +524,9 @@ describe('CartService', () => {
       });
       mockTx.cartItem.findUnique.mockResolvedValue(null);
       mockTx.cartItem.count.mockResolvedValue(0);
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: 1 }));
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: 1 }),
+      );
       seedSummaryFindMany(1, 1100, 77);
 
       await service.addToCart(USER_ID, dto);
@@ -487,7 +541,9 @@ describe('CartService', () => {
       });
       mockTx.cartItem.findUnique.mockResolvedValue(null);
       mockTx.cartItem.count.mockResolvedValue(0);
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: 1 }));
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: 1 }),
+      );
       seedSummaryFindMany(1, 1100, 77);
 
       await service.addToCart(USER_ID, dto);
@@ -516,7 +572,9 @@ describe('CartService', () => {
         stock: 100,
         product: { is_active: true },
       });
-      mockTx.cartItem.findUnique.mockResolvedValue({ quantity: MAX_CART_ITEM_QUANTITY }); // 20
+      mockTx.cartItem.findUnique.mockResolvedValue({
+        quantity: MAX_CART_ITEM_QUANTITY,
+      }); // 20
 
       await expect(service.addToCart(USER_ID, dto)).rejects.toThrow(
         new BadRequestException(CartMessages.maxQuantityReached),
@@ -530,8 +588,12 @@ describe('CartService', () => {
         stock: 100,
         product: { is_active: true },
       });
-      mockTx.cartItem.findUnique.mockResolvedValue({ quantity: MAX_CART_ITEM_QUANTITY - 1 }); // 19
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: MAX_CART_ITEM_QUANTITY }));
+      mockTx.cartItem.findUnique.mockResolvedValue({
+        quantity: MAX_CART_ITEM_QUANTITY - 1,
+      }); // 19
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: MAX_CART_ITEM_QUANTITY }),
+      );
       seedSummaryFindMany(MAX_CART_ITEM_QUANTITY, 1100, 77);
 
       await expect(service.addToCart(USER_ID, dto)).resolves.toBeDefined();
@@ -600,7 +662,9 @@ describe('CartService', () => {
       });
       // Line already exists — cap check path is skipped entirely
       mockTx.cartItem.findUnique.mockResolvedValue({ quantity: 2 });
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: 3 }));
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: 3 }),
+      );
       seedSummaryFindMany(3, 1100, 77);
 
       await expect(service.addToCart(USER_ID, dto)).resolves.toBeDefined();
@@ -614,7 +678,9 @@ describe('CartService', () => {
       });
       mockTx.cartItem.findUnique.mockResolvedValue(null);
       mockTx.cartItem.count.mockResolvedValue(0);
-      mockTx.cartItem.upsert.mockResolvedValue(makeCartItemRow({ quantity: 1 }));
+      mockTx.cartItem.upsert.mockResolvedValue(
+        makeCartItemRow({ quantity: 1 }),
+      );
       seedSummaryFindMany(1, 1100, 77);
 
       const result = await service.addToCart(USER_ID, dto);
@@ -622,10 +688,10 @@ describe('CartService', () => {
       expect(result).toHaveProperty('item');
       expect(result).toHaveProperty('summary');
       expect(result.summary).toMatchObject({
-        total_items: expect.any(Number),
-        total_price: expect.any(String),
-        total_discount: expect.any(String),
-        final_amount: expect.any(String),
+        total_items: anyOf(Number),
+        total_price: anyOf(String),
+        total_discount: anyOf(String),
+        final_amount: anyOf(String),
       });
     });
 
@@ -690,8 +756,12 @@ describe('CartService', () => {
       // updateMany returns { count: 1 }
       mockPrisma.cartItem.updateMany.mockResolvedValue({ count: 1 });
       // findUnique re-reads the updated row
-      mockPrisma.cartItem.findUnique.mockResolvedValue(makeCartItemRow({ quantity: 5 }));
-      mockPrisma.cartItem.findMany.mockResolvedValue([makeSummaryRow(5, 1100, 77)]);
+      mockPrisma.cartItem.findUnique.mockResolvedValue(
+        makeCartItemRow({ quantity: 5 }),
+      );
+      mockPrisma.cartItem.findMany.mockResolvedValue([
+        makeSummaryRow(5, 1100, 77),
+      ]);
 
       await expect(
         service.updateItem(USER_ID, ITEM_ID, { quantity: 5 }),
@@ -704,8 +774,12 @@ describe('CartService', () => {
         product_variant: { stock: 10 },
       });
       mockPrisma.cartItem.updateMany.mockResolvedValue({ count: 1 });
-      mockPrisma.cartItem.findUnique.mockResolvedValue(makeCartItemRow({ quantity: 3 }));
-      mockPrisma.cartItem.findMany.mockResolvedValue([makeSummaryRow(3, 1100, 77)]);
+      mockPrisma.cartItem.findUnique.mockResolvedValue(
+        makeCartItemRow({ quantity: 3 }),
+      );
+      mockPrisma.cartItem.findMany.mockResolvedValue([
+        makeSummaryRow(3, 1100, 77),
+      ]);
 
       const result = await service.updateItem(USER_ID, ITEM_ID, dto);
 
@@ -722,8 +796,12 @@ describe('CartService', () => {
         product_variant: { stock: 10 },
       });
       mockPrisma.cartItem.updateMany.mockResolvedValue({ count: 1 });
-      mockPrisma.cartItem.findUnique.mockResolvedValue(makeCartItemRow({ quantity: 3 }));
-      mockPrisma.cartItem.findMany.mockResolvedValue([makeSummaryRow(3, 1100, 77)]);
+      mockPrisma.cartItem.findUnique.mockResolvedValue(
+        makeCartItemRow({ quantity: 3 }),
+      );
+      mockPrisma.cartItem.findMany.mockResolvedValue([
+        makeSummaryRow(3, 1100, 77),
+      ]);
 
       await service.updateItem(USER_ID, ITEM_ID, { quantity: 3 });
 
@@ -741,8 +819,12 @@ describe('CartService', () => {
         product_variant: { stock: 10 },
       });
       mockPrisma.cartItem.updateMany.mockResolvedValue({ count: 1 });
-      mockPrisma.cartItem.findUnique.mockResolvedValue(makeCartItemRow({ quantity: 3 }));
-      mockPrisma.cartItem.findMany.mockResolvedValue([makeSummaryRow(3, 1100, 77)]);
+      mockPrisma.cartItem.findUnique.mockResolvedValue(
+        makeCartItemRow({ quantity: 3 }),
+      );
+      mockPrisma.cartItem.findMany.mockResolvedValue([
+        makeSummaryRow(3, 1100, 77),
+      ]);
 
       await service.updateItem(USER_ID, ITEM_ID, { quantity: 3 });
 

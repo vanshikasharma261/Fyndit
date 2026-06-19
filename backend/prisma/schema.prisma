@@ -89,6 +89,13 @@ model Address {
 
   address_type AddressType
 
+  // Exactly one default per user while they have >=1 active address.
+  is_default Boolean @default(false)
+
+  // Soft delete: is_removed is the flag, removed_at the timestamp (mirrors
+  // User's is_deleted/deleted_at pair). Removed rows never list and don't
+  // count toward the 5-active-address limit.
+  is_removed Boolean   @default(false)
   removed_at DateTime?
 
   created_at DateTime @default(now())

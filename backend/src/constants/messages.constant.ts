@@ -40,6 +40,17 @@ export const CartMessages = {
   cartItemNotFound: 'Cart item not found',
 } as const;
 
+export const AddressMessages = {
+  addSuccess: 'Address added successfully',
+  updateSuccess: 'Address updated successfully',
+  removeSuccess: 'Address removed successfully',
+  defaultSuccess: 'Default address updated',
+  // The user already has the maximum number of active addresses (400).
+  limitReached: 'You can save at most 5 addresses',
+  // Ownership / lookup failure (404).
+  notFound: 'Address not found',
+} as const;
+
 export const ProductMessages = {
   productNotFound: 'Product not found',
   invalidAttributesFilter:

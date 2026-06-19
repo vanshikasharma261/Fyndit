@@ -8,6 +8,7 @@ import authReducer from "../features/auth/authSlice";
 import productsReducer from "../features/products/productsSlice";
 import userReducer from "../features/user/userSlice";
 import cartReducer from "../features/cart/cartSlice";
+import addressReducer from "../features/address/addressSlice";
 import type { RootState } from "../store/store";
 
 /**
@@ -20,6 +21,7 @@ const rootReducer = combineReducers({
   products: productsReducer,
   user: userReducer,
   cart: cartReducer,
+  address: addressReducer,
 });
 
 /** Creates a fresh test store with optional preloaded state slices. */

@@ -28,7 +28,11 @@ interface VariantOverrides {
   discount?: number;
   /** Use `undefined` to omit the key (raw null cannot be expressed via Partial here) */
   attributes?: Prisma.JsonValue;
-  images?: { image_url: string; alt_text: string | null; is_primary: boolean }[];
+  images?: {
+    image_url: string;
+    alt_text: string | null;
+    is_primary: boolean;
+  }[];
 }
 
 function makeVariant(overrides: VariantOverrides = {}) {
@@ -100,9 +104,9 @@ describe('ProductService', () => {
       mockAuthService.isUserActive.mockResolvedValue(false);
       mockPrisma.category.findMany.mockResolvedValue([]);
 
-      await expect(
-        service.listProducts('user-1', 'All', {}),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.listProducts('user-1', 'All', {})).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('throws ForbiddenException when user is not active (getProductDetail)', async () => {
@@ -116,9 +120,9 @@ describe('ProductService', () => {
     it('throws ForbiddenException when user is not active (getCategoryFilters)', async () => {
       mockAuthService.isUserActive.mockResolvedValue(false);
 
-      await expect(
-        service.getCategoryFilters('user-1', 'All'),
-      ).rejects.toThrow(ForbiddenException);
+      await expect(service.getCategoryFilters('user-1', 'All')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 
@@ -181,10 +185,10 @@ describe('ProductService', () => {
 
       await service.listProducts(userId, 'All', {});
 
-      const findCall = mockPrisma.product.findMany.mock.calls[0][0] as {
-        skip: number;
-        take: number;
-      };
+      const findCalls = mockPrisma.product.findMany.mock.calls as Array<
+        [{ skip: number; take: number }]
+      >;
+      const findCall = findCalls[0][0];
       expect(findCall.skip).toBe(0); // (page 1 - 1) * 12
       expect(findCall.take).toBe(12);
     });
@@ -197,10 +201,10 @@ describe('ProductService', () => {
       const query: ListProductsQueryDto = { page: 2, limit: 5 };
       await service.listProducts(userId, 'All', query);
 
-      const findCall = mockPrisma.product.findMany.mock.calls[0][0] as {
-        skip: number;
-        take: number;
-      };
+      const findCalls = mockPrisma.product.findMany.mock.calls as Array<
+        [{ skip: number; take: number }]
+      >;
+      const findCall = findCalls[0][0];
       expect(findCall.skip).toBe(5); // (2 - 1) * 5
       expect(findCall.take).toBe(5);
     });
@@ -231,9 +235,10 @@ describe('ProductService', () => {
 
       await service.listProducts(userId, 'clothing', {});
 
-      const findCall = mockPrisma.product.findMany.mock.calls[0][0] as {
-        where: { category_id?: { in: string[] } };
-      };
+      const findCalls = mockPrisma.product.findMany.mock.calls as Array<
+        [{ where: { category_id?: { in: string[] } } }]
+      >;
+      const findCall = findCalls[0][0];
       expect(findCall.where.category_id?.in).toEqual(
         expect.arrayContaining(['cat-m', 'cat-w']),
       );
@@ -252,9 +257,10 @@ describe('ProductService', () => {
       const result = await service.listProducts(userId, 'unknown-slug', {});
 
       // findMany receives an in: [] filter that matches nothing
-      const findCall = mockPrisma.product.findMany.mock.calls[0][0] as {
-        where: { category_id?: { in: string[] } };
-      };
+      const findCalls = mockPrisma.product.findMany.mock.calls as Array<
+        [{ where: { category_id?: { in: string[] } } }]
+      >;
+      const findCall = findCalls[0][0];
       expect(findCall.where.category_id?.in).toEqual([]);
       expect(result.items).toHaveLength(0);
     });
@@ -266,9 +272,10 @@ describe('ProductService', () => {
 
       await service.listProducts(userId, 'All', { search: 'nike' });
 
-      const findCall = mockPrisma.product.findMany.mock.calls[0][0] as {
-        where: { OR?: unknown[] };
-      };
+      const findCalls = mockPrisma.product.findMany.mock.calls as Array<
+        [{ where: { OR?: unknown[] } }]
+      >;
+      const findCall = findCalls[0][0];
       expect(findCall.where.OR).toBeDefined();
       expect(findCall.where.OR).not.toHaveLength(0);
     });
@@ -280,14 +287,12 @@ describe('ProductService', () => {
 
       await service.listProducts(userId, 'All', { search: 'under 500' });
 
-      const findCall = mockPrisma.product.findMany.mock.calls[0][0] as {
-        where: { OR?: unknown[] };
-      };
+      const findCalls = mockPrisma.product.findMany.mock.calls as Array<
+        [{ where: { OR?: unknown[] } }]
+      >;
+      const findCall = findCalls[0][0];
       const pricePredicate = (findCall.where.OR ?? []).find(
-        (c) =>
-          typeof c === 'object' &&
-          c !== null &&
-          'variants' in c,
+        (c) => typeof c === 'object' && c !== null && 'variants' in c,
       );
       expect(pricePredicate).toBeDefined();
     });
@@ -302,8 +307,16 @@ describe('ProductService', () => {
             discount: decimal(0),
             attributes: {},
             images: [
-              { image_url: '/img/secondary.jpg', is_primary: false, sort_order: 1 },
-              { image_url: '/img/primary.jpg', is_primary: true, sort_order: 2 },
+              {
+                image_url: '/img/secondary.jpg',
+                is_primary: false,
+                sort_order: 1,
+              },
+              {
+                image_url: '/img/primary.jpg',
+                is_primary: true,
+                sort_order: 2,
+              },
             ],
           },
         ],
@@ -320,7 +333,12 @@ describe('ProductService', () => {
       const productNoImages = {
         ...sampleProduct,
         variants: [
-          { price: decimal(100), discount: decimal(0), attributes: {}, images: [] },
+          {
+            price: decimal(100),
+            discount: decimal(0),
+            attributes: {},
+            images: [],
+          },
         ],
       };
       mockPrisma.product.findMany.mockResolvedValue([productNoImages]);
@@ -386,7 +404,10 @@ describe('ProductService', () => {
 
       const result = await service.getProductDetail(userId, slug);
 
-      expect(result.variants[0].attributes).toEqual({ color: 'red', size: 'M' });
+      expect(result.variants[0].attributes).toEqual({
+        color: 'red',
+        size: 'M',
+      });
     });
 
     it('throws NotFoundException when product is not found', async () => {
@@ -417,7 +438,11 @@ describe('ProductService', () => {
         variants: [
           makeVariant({
             images: [
-              { image_url: '/img/1.jpg', alt_text: 'front view', is_primary: true },
+              {
+                image_url: '/img/1.jpg',
+                alt_text: 'front view',
+                is_primary: true,
+              },
               { image_url: '/img/2.jpg', alt_text: null, is_primary: false },
             ],
           }),

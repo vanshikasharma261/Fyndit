@@ -30,6 +30,7 @@ import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { validationExceptionFactory } from '../src/common/validation/validation-exception.factory';
 import { CartMessages } from '../src/constants/messages.constant';
 import { MAX_CART_ITEM_QUANTITY } from '../src/constants/values.constant';
+import { CartResponse, UpdateCartResponse } from '../src/cart/types/cart.types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -106,6 +107,15 @@ const mockConfigService = {
 function cookieHeader(token: string): string {
   return `access_token=${token}`;
 }
+
+/**
+ * Thin wrappers over jest's asymmetric matchers. The built-in `expect.*`
+ * matchers are typed as `any`, which trips `no-unsafe-assignment` when nested
+ * as a property value. Re-typing the result as `unknown` keeps behavior
+ * identical while satisfying the type checker.
+ */
+const containing = (obj: object): unknown => expect.objectContaining(obj);
+const anyOf = (ctor: unknown): unknown => expect.any(ctor);
 
 /** Minimal CartResponse fixture for happy-path tests. */
 function cartResponse() {
@@ -310,14 +320,15 @@ describe('CartController (e2e)', () => {
         .set('Cookie', cookieHeader(validToken));
 
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({
-        summary: expect.objectContaining({
-          total_items: expect.any(Number),
-          total_price: expect.any(String),
-          total_discount: expect.any(String),
-          final_amount: expect.any(String),
+      const body = res.body as CartResponse;
+      expect(body).toMatchObject({
+        summary: containing({
+          total_items: anyOf(Number),
+          total_price: anyOf(String),
+          total_discount: anyOf(String),
+          final_amount: anyOf(String),
         }),
-        items: expect.any(Array),
+        items: anyOf(Array),
       });
     });
 
@@ -347,8 +358,9 @@ describe('CartController (e2e)', () => {
         .set('Cookie', cookieHeader(validToken));
 
       expect(res.status).toBe(200);
-      expect(res.body.items).toHaveLength(0);
-      expect(res.body.summary.total_items).toBe(0);
+      const body = res.body as CartResponse;
+      expect(body.items).toHaveLength(0);
+      expect(body.summary.total_items).toBe(0);
     });
   });
 
@@ -428,7 +440,8 @@ describe('CartController (e2e)', () => {
         .send({ product_variant_id: VARIANT_UUID });
 
       expect(res.status).toBe(400);
-      expect(res.body.message).toContain(CartMessages.cartFull);
+      const body = res.body as { message: string };
+      expect(body.message).toContain(CartMessages.cartFull);
     });
   });
 
@@ -446,10 +459,11 @@ describe('CartController (e2e)', () => {
         .send({ quantity: 3 });
 
       expect(res.status).toBe(200);
-      expect(res.body).toMatchObject({
+      const body = res.body as UpdateCartResponse;
+      expect(body).toMatchObject({
         message: CartMessages.updateSuccess,
-        item: expect.any(Object),
-        summary: expect.any(Object),
+        item: anyOf(Object),
+        summary: anyOf(Object),
       });
     });
 

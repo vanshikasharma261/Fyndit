@@ -28,6 +28,14 @@ const mockRes = {
   clearCookie: jest.fn(),
 } as unknown as import('express').Response;
 
+/**
+ * Thin wrapper over jest's `expect.objectContaining`. The built-in matcher is
+ * typed as `any`, which trips `no-unsafe-assignment` when nested as a property
+ * value. Re-typing the result as `unknown` keeps behavior identical while
+ * satisfying the type checker.
+ */
+const containing = (obj: object): unknown => expect.objectContaining(obj);
+
 describe('UserService', () => {
   let service: UserService;
 
@@ -154,10 +162,16 @@ describe('UserService', () => {
       mockAuthService.isUserActive.mockResolvedValue(true);
       mockPrismaService.user.update.mockResolvedValue(updatedRow);
 
-      const dto: UpdateUserDto = { email: 'new@example.com', phone: '1234567890' };
+      const dto: UpdateUserDto = {
+        email: 'new@example.com',
+        phone: '1234567890',
+      };
       await service.updateUser(userId, dto);
 
-      const callArg = mockPrismaService.user.update.mock.calls[0][0] as { data: Record<string, unknown> };
+      const updateCalls = mockPrismaService.user.update.mock.calls as Array<
+        [{ data: Record<string, unknown> }]
+      >;
+      const callArg = updateCalls[0][0];
       expect(callArg.data).toEqual({
         email: 'new@example.com',
         phone: '1234567890',
@@ -247,7 +261,7 @@ describe('UserService', () => {
       expect(mockPrismaService.user.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { user_id: userId },
-          data: expect.objectContaining({
+          data: containing({
             is_deleted: true,
             is_active: false,
           }),
@@ -262,9 +276,10 @@ describe('UserService', () => {
 
       await service.deleteUser(userId, mockRes);
 
-      const callArg = mockPrismaService.user.update.mock.calls[0][0] as {
-        data: Record<string, unknown>;
-      };
+      const updateCalls = mockPrismaService.user.update.mock.calls as Array<
+        [{ data: Record<string, unknown> }]
+      >;
+      const callArg = updateCalls[0][0];
       expect(callArg.data.deleted_at).toBeInstanceOf(Date);
     });
 

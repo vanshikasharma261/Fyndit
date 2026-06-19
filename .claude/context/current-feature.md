@@ -1,163 +1,93 @@
 ## Current Feature
 
-**Cart Feature — Backend Cart Module + Frontend Cart Page** (spec: `007-cart-feature.md`)
+**Address Module — Backend Address Module + Frontend Profile Addresses** (spec: `008-address-module.md`)
 
-Branch: `feature/cart-module` (cut from `main`).
+Branch: `feature/address-module` (cut from `main`).
 
-Implements the full cart experience: a backend `cart` module owning view / add / update-quantity / remove, and a frontend Cart page (populated `cart_ui.png` / empty `empty_cart_ui.png`) plus the wired product-detail "Add to Cart" button and a live navbar cart badge. Cart summary = total items / total price / total product discount / final amount; **coupons are excluded** (applied at checkout). Quantities are stock-bounded (min 1, max current stock); out-of-stock/inactive products can't be added.
+Makes the Profile page **Addresses** panel live. A backend `address` module owns get-all / add / update / soft-remove / set-default; the frontend `features/address/` + `components/Addresses/` replace the static placeholder with a list ⇄ add/edit form. Bounded by **max 5 active addresses per user**; exactly one **default** (first address auto-default; "Set as default" from the list; removing the default auto-promotes the newest remaining). Screenshots are the source of truth (`address_add_form_ui.png`, `address_update_form_ui.png`, `validation_error_address_update.png`).
 
 ## Status
 
-Done — backend `cart` module + frontend Cart page/feature implemented; schema migration applied; lint/build clean on both apps; backend Jest+Supertest and frontend Vitest/RTL+Playwright green; reviewed (quality/prisma/security/ui) with approved fixes applied; context refined. See History entry 9.
+**Done** — all 7 workflow phases complete (spec approved → implemented → tested → reviewed → context refined → finalized). See History entry 10. Ready for commit + PR.
 
 ## Goal
 
-Deliver end-to-end cart functionality for the authenticated user. Backend: a feature-isolated `cart` module mirroring `product`/`user` conventions (thin controller, logic in `CartService`, `PrismaService` only, no `any`, response contracts in `cart/types/`, copy in a new `CartMessages` group, `JwtAuthGuard` + `assertActiveUser` precheck on every op; identity from `@CurrentUser()` only; ownership-checked). Frontend: a `CartPage` + `features/cart/` slice/service/types mirroring the established architecture, the wired product-detail "Add to Cart" button, and the navbar cart badge reflecting the live item count. Screenshots are the source of truth (`cart_ui.png`, `empty_cart_ui.png`). See `specs/007-cart-feature.md` for the full Definition of Done.
+Deliver end-to-end address management for the authenticated user. Backend: a feature-isolated `address` module mirroring `cart`/`user` conventions (thin controller, logic in `AddressService`, `PrismaService` only, no `any`, response contracts in `address/types/`, copy in a new `AddressMessages` group, `JwtAuthGuard` + `assertActiveUser` precheck on every op; identity from `@CurrentUser()` only; ownership-scoped writes → 404 on foreign/removed ids). Frontend: `features/address/` slice/service/types + `components/Addresses/` (Panel/Card/Form) rendered in the Profile page right card, mirroring the cart/user architecture. See `specs/008-address-module.md` for the full Definition of Done.
 
 ## Scope / Plan
 
 ### Confirmed decisions
 
-1. **Add when already in cart → increment quantity by 1** (capped at stock); new variant → create at qty 1; add takes only `product_variant_id`.
-2. **Full frontend**: Cart page + wire product-detail "Add to Cart" + live navbar badge (was hardcoded `0`).
-3. **Coupon excluded** from the cart summary (coupons belong to checkout).
-4. **Strict stock enforcement (400)**: update qty > stock → 400; qty < 1 → 400; add/increment beyond stock → 400; add out-of-stock/inactive → 400.
-5. **No pagination; max 25 distinct items (`MAX_CART_ITEMS = 25`)**: `GET /cart` returns the whole cart (summary + all items). Adding a **new** variant when the cart already has 25 lines → 400 `cartFull` ("checkout or remove an item"); incrementing an existing line is unaffected. Overrides the dev-rules "paginate cart items" rule for this feature (reconcile in Phase 6). "25 items" = 25 distinct lines, not units.
-6. **Schema change approved**: add `@@unique([cart_id, product_variant_id])` to `CartItem` (migration `cart_item_unique_variant`) so "add" uses an atomic `upsert`.
+1. **Feedback — react-toastify for op success/errors (add/update/remove/set-default); inline per-field validation errors** under each form field (red border + message), matching `validation_error_address_update.png`.
+2. **State = `INDIAN_STATES` dropdown; Country fixed India (disabled).** Backend `@IsIn(INDIAN_STATES)` + `@IsIn([SUPPORTED_COUNTRY])`, identical to signup. Frontend reuses `constants/location.ts`.
+3. **Default address in scope** (`is_default` column). First address auto-default; "Set as default" from the list card (forms unchanged); the default card shows a "Default" badge; setting a new default unsets the previous in a transaction.
+4. **Removing the default auto-promotes the most-recently-created remaining active address** (same transaction).
+5. **5-active-address limit**: backend rejects a 6th (`BadRequestException`, `MAX_ACTIVE_ADDRESSES = 5`); frontend hides "Add Address" at 5 (+ note).
+6. **Soft delete only**: remove sets `is_removed = true` + `removed_at = now()`; removed rows never list and don't count toward the limit.
+7. **Schema change approved**: add `is_removed Boolean @default(false)` + `is_default Boolean @default(false)` to `Address` (migration `address_is_removed_is_default`; migrations only).
+
+### Backend — `address` module (`backend/src/address/`)
+
+```
+backend/src/address/
+├── address.module.ts          // imports AuthModule; PrismaModule is global
+├── address.controller.ts      // @UseGuards(JwtAuthGuard); @CurrentUser() only
+├── address.service.ts
+├── dto/{create-address,update-address}.dto.ts   // update = PartialType(create)
+└── types/address.types.ts
+```
+
+Register `AddressModule` in `AppModule`. Every op runs `assertActiveUser` (401) before any DB access; user id from the JWT only; ownership-scoped `updateMany`/`deleteMany`-style writes (`count === 0` → 404). Endpoints: `GET /address` (active only, default-first), `POST /address` (`201`; 5-limit guard; first → default), `PATCH /address/:addressId` (present-keys-only update), `PATCH /address/:addressId/default` (transaction: unset others + set target; returns refreshed list), `DELETE /address/:addressId` (soft-remove + auto-promote). `:addressId` via `ParseUUIDPipe`. New `AddressMessages` group; `MAX_ACTIVE_ADDRESSES = 5` in `values.constant.ts`. Contract: `AddressResponse` (address_id, address_type, line1, line2, city, state, country, zip, is_default — no sensitive cols).
+
+### Frontend — Profile Addresses panel
+
+```
+frontend/src/
+├── features/address/{addressSlice.ts, addressService.ts, types.ts}   // AddressState
+├── types/address.types.ts                                            // API contracts
+├── components/Addresses/{AddressesPanel,AddressCard,AddressForm}.tsx + *.module.css
+├── pages/Profile/ProfilePage.tsx     // render <AddressesPanel/> (placeholder removed)
+└── store/store.ts                    // register `address` reducer
+```
+
+- `addressService.ts` — all `fetch` (`credentials: "include"`, `ApiResult<T>`): `list`, `add`, `update`, `remove`, `setDefault`.
+- `addressSlice.ts` — thunks `fetchAddresses` / `addAddress` / `updateAddress` / `removeAddress` / `setDefaultAddress`; branch on `ok`; synthetic `NETWORK_ERROR`; `errors` holds the per-field form map (inline); op feedback via `.unwrap()` toasts in the component (Cart pattern). Reset on logout/sessionExpired/deleteUser. `AddressState`: `{ items, loading, saving, mutatingId, errors }`.
+- `AddressesPanel` — list mode (cards + dashed "Add Address", hidden at 5) ⇄ form mode (blank add / pre-filled edit) within the right Profile card.
+- `AddressForm` — `ADDRESS TYPE` pills (HOME default), line1/line2/city, State (`INDIAN_STATES` dropdown), Country (India disabled), zip; Cancel + Add/Update; inline field errors with reserved height.
+- `AddressCard` — type badge, lines, City/State, zip chip, "Default" badge, pencil/trash + "Set as default" action.
+- CSS Modules + theme tokens only; responsive.
+
+---
+
+## Prior Feature — Cart Feature (Backend Cart Module + Frontend Cart Page) (spec: `007-cart-feature.md`) — Done
+
+Full cart experience: a backend `cart` module (view / add / update-qty / remove) + the Cart page (`cart_ui.png` / `empty_cart_ui.png`), the wired product-detail "Add to Cart", and a live navbar badge. This is the closest precedent for the address feature — the same backend module shape and the same frontend feedback approach are reused below. (Full details in **History** entry 9.)
 
 ### Backend — `cart` module (`backend/src/cart/`)
 
-```
-backend/src/cart/
-├── cart.module.ts            // imports AuthModule; PrismaModule is global
-├── cart.controller.ts        // @UseGuards(JwtAuthGuard); @CurrentUser() only
-├── cart.service.ts
-├── dto/{add-cart-item,update-cart-item}.dto.ts
-└── types/cart.types.ts
-```
+- New `cart/` module (controller, `CartService`, `AddCartItemDto`/`UpdateCartItemDto`, `types/cart.types.ts`) registered in `AppModule`; imports `AuthModule`. `JwtAuthGuard` + `assertActiveUser` precheck (401) on every op; identity from `@CurrentUser()` only; `:cartItemId` via `ParseUUIDPipe`.
+- **Ownership-scoped writes** via `updateMany`/`deleteMany` (`count === 0` → 404, never a Prisma `P2025`/500) — the pattern the address update/remove/set-default reuse. Count-bounded `upsert` runs in a Serializable `$transaction` so concurrent writes can't breach caps. Money serialized as `"0.00"` strings (`Prisma.Decimal`, never float). `MAX_CART_ITEMS`/`MAX_CART_ITEM_QUANTITY` live in `values.constant.ts`; `CartMessages` in `messages.constant.ts`.
 
-Register `CartModule` in `AppModule`. Every op runs `assertActiveUser` (401) before any DB access; user id from the JWT only; ownership violations → 404; money serialized as `"0.00"` strings via `Decimal.toFixed(2)`; `final_price = max(0, price − discount)`; preview image = primary else lowest `sort_order`; `total_items` = Σ quantities (drives the badge). Endpoints: `GET /cart` (summary over all items + every item, no pagination), `POST /cart` (add/increment via `upsert`; blocks a 26th distinct line with `cartFull`), `PATCH /cart/:cartItemId` (update qty, `1..stock`), `DELETE /cart/:cartItemId` (message). `:cartItemId` validated with `ParseUUIDPipe`. `MAX_CART_ITEMS = 25` in `values.constant.ts`; new `CartMessages` group in `messages.constant.ts`. Contracts: `CartItem`, `CartSummary`, `CartResponse`, `AddToCartResponse`, `UpdateCartResponse` (see spec).
+### Frontend — Cart page + badge
 
-### Frontend — Cart page + Add-to-Cart + badge
+- `features/cart/` (slice/service/types) — `CartState` has **no `message`**: operational feedback is **react-toastify** toasts surfaced by the component via `.unwrap()` (green success / red error, top-right); the slice owns data + busy flags only. Resets on `logoutUser.fulfilled` / `sessionExpired` / `deleteUser.fulfilled`. `cart` reducer registered. **This is the exact feedback pattern the address feature reuses** (toasts for ops, inline map for form validation).
+- `pages/Cart/` (populated + empty), `types/cart.types.ts`; `MainLayout` badge = `summary.total_items`. `ApiResult<T>` service layer, `NETWORK_ERROR` from shared `NetworkErrorMessages`/`NETWORK_ERROR_STATUS`. CSS Modules + theme tokens only; responsive.
 
-```
-frontend/src/
-├── pages/Cart/{CartPage.tsx, Cart.module.css}   // replaces /cart placeholder
-├── features/cart/{cartSlice.ts, cartService.ts, types.ts}   // CartState
-├── types/cart.types.ts                          // API contracts
-├── routes/router.tsx · store/store.ts           // route + register `cart` reducer
-├── layouts/MainLayout/MainLayout.tsx            // badge = summary.total_items; fetchCart when authed
-└── pages/ProductDetail/ProductDetailPage.tsx    // wire "Add to Cart"
-```
-
-- `cartService.ts` — all `fetch` (`credentials: "include"`, `ApiResult<T>`): `getCart`, `addToCart`, `updateItem`, `removeItem`.
-- `cartSlice.ts` — thunks `fetchCart` / `addToCart` / `updateCartItem` / `removeCartItem`; branch on `ok`; synthetic `NETWORK_ERROR` from shared `NetworkErrorMessages`; `add`/`update` patch `summary` so the badge stays live; `remove` re-fetches the cart. `CartState`: `{ items, summary, loading, error, mutatingId, message }`.
-- **Populated (`cart_ui.png`)** — left "Shopping Cart" item cards (image, name, brand, attribute pills, discount % + struck price + final price, "In Stock", quantity stepper bounded `1..stock`, "Remove Item"); right "PRICE DETAILS" (Price / Discount / Total Amount + save note + CHECKOUT placeholder).
-- **Empty (`empty_cart_ui.png`)** — centered "Your Cart is empty" + illustration; no summary/CHECKOUT; badge 0.
-- Reuse `utils/format.ts`, `utils/image.ts`; CSS Modules + theme tokens only; responsive (columns stack on mobile).
-
----
-
-## Prior Feature — Product Browsing (Backend Product Module + Frontend Product Pages) (spec: `004-products-listing.md`) — Done
-
-Implemented end-to-end product browsing for Fyndit: a feature-isolated backend `product` module (paginated/searchable/filterable listing, category facets, single-product detail) plus the frontend product listing page, functional filter sidebar, and product preview page. Wires the navbar category links and the global search bar to the listing endpoint, and powers pagination via `react-paginate`. This is the second frontend feature and the first to consume real catalog data seeded in `001-prisma-setup.md`.
-
-Goal: Deliver a production-ready, screenshot-faithful browsing experience where category navigation, search, attribute/price filtering, pagination, and product detail are all URL-driven (shareable + refresh-safe), backed by typed, `PrismaService`-only endpoints.
-
-### Backend — `product` module (`backend/src/product/`)
-
-Mirror the `auth` module conventions: thin controllers, all logic in `ProductService`, `PrismaService` only, no `any`, interfaces for response contracts in `product/types/`, human strings in `src/constants/messages.constant.ts` (`ProductMessages`). Register `ProductModule` in `AppModule`. **All endpoints public** — no `JwtAuthGuard`.
-
-Structure:
-
-```
-backend/src/product/
-├── product.module.ts
-├── product.controller.ts
-├── product.service.ts
-├── dto/list-products-query.dto.ts
-└── types/product.types.ts
-```
-
-- **Money serialization:** prices live on `ProductVariant` as `Decimal(10,2)`; serialize `price`/`discount` as `"0.00"` **strings** (`Decimal.toFixed(2)`) — no Decimal/float leakage to the client.
-- **Endpoint 1 — `GET /product/:category`** (paginated list). `category` is a slug or the literal `All`. DTO `ListProductsQueryDto` (all optional): `search` (trimmed, case-insensitive on name/brand/description, also parse "under N" price phrases via `OR`), `page` (default 1, `@IsInt`/`@Min(1)`), `limit` (default 12, `@Min(1)`/`@Max(50)`), `minPrice`/`maxPrice` (`@IsNumber`/`@Min(0)`; maxPrice ignored if `< minPrice`), `attributes` (URL-encoded JSON `Record<string,string[]>` parsed/validated via `@Transform`, 400 on malformed). Service: resolve category scope to ids (`All`→none; leaf→self; parent like `electronics`→self+all descendants; `Clothing`→`mens-clothing`+`womens-clothing`; unknown slug→empty result with valid meta, **not 500**); constrain `is_active: true`; apply price + attribute filters at the **variant level** with same-variant match (`variants: { some: { price gte/lte, AND of OR-per-key JSON path filters } }`); OR within a key, AND across keys; unknown attr keys ignored; paginate (`skip`/`take` + parallel `count`); return representative variant (prefer one satisfying active filters; else lowest-priced) + primary image (`is_primary` else lowest `sort_order`). Build `where` from a typed options object in one private helper.
-- **Endpoint 2 — `GET /product/detail/:slug`** (declare **before** `:category`). One active product by slug + category + all variants (sku/stock/price/discount/attributes) + each variant's images (ordered `is_primary` then `sort_order`). Not found/inactive → `NotFoundException(ProductMessages.productNotFound)`.
-- **Endpoint 3 — `GET /product/:category/filters`** (declare **before** `:category`). Resolve scope ids (same resolver); read attribute names from `CategoryAttribute` for those categories (`All` → none, price only); collect distinct values per key across in-scope active variants' JSON `attributes` (in-memory reduction, acceptable at this catalog size); price range via Prisma `aggregate`, serialized as `"0.00"` strings. Facets reflect the **unfiltered** scope (search may apply) so toggling never removes options.
-
-Response contracts: `ProductListItem`, `PaginationMeta`, `ProductListResponse`, `ProductVariantDetail`, `ProductDetailResponse`, `AttributeFacet`, `ProductFiltersResponse` (see spec for exact shapes).
-
-### Frontend — product pages
-
-Install `react-paginate` (ships its own types). Mirror the `auth` feature layout (service + slice + types separated). Register the `products` reducer in `src/store/store.ts`. CSS Modules only, typed Redux hooks, no `fetch` in components.
-
-Structure:
-
-```
-frontend/src/
-├── pages/Products/{ProductsPage.tsx, Products.module.css}
-├── pages/ProductDetail/{ProductDetailPage.tsx, ProductDetail.module.css}
-├── features/products/{productsSlice.ts, productService.ts}
-├── components/Pagination/{Pagination.tsx, Pagination.module.css}
-├── components/FilterSidebar/{FilterSidebar.tsx, FilterSidebar.module.css}
-├── types/product.types.ts
-└── routes/router.tsx  (add /product/:category + /product/detail/:slug under MainLayout)
-```
-
-- **Navigation model:** navbar items map to category scopes — For You → `/` (no fetch); Clothing → `mens-clothing`+`womens-clothing`; Electronics → `electronics` (+descendants); Mobile → `mobile-phones`; **Furniture (replaces "Books")** → `furniture`; Select Category dropdown of categories holding products. Update `NAV_LINKS` in `MainLayout.tsx` and the footer "Shop" column.
-- **Routing / URL as source of truth:** `/product/:category`, `?search=`, `?page=`, `?minPrice=`/`?maxPrice=`, `?attributes=<URL-encoded JSON>`, and `/product/detail/:slug`. Search submit → `/product/All?search=<term>`. Filters live in the query string (shareable, refresh-safe); toggling a value adds/removes it in the `attributes` map (drop empty keys); any filter change resets `page` to 1.
-- **`productService.ts`:** all fetch calls, `VITE_API_URL`, `ApiResult<T>` `{ ok, status, data }` pattern; public GETs (no `credentials: "include"`). `list`, `filters`, `detail`; `buildProductListPath` / `buildFiltersPath` helpers.
-- **`productsSlice.ts`:** `createSlice` + `createAsyncThunk` (`fetchProducts`, `fetchFilters`, `fetchProductDetail`); branch on `ApiResult.ok`. Re-fetch `fetchFilters` only on category/search change, **not** on every filter toggle.
-- **Pagination component:** thin wrapper over `react-paginate` (0-based → 1-based via `forcePage={currentPage-1}` and `selected+1`); render only when `total_pages > 1`.
-- **Listing page** (`products_page_clothing_category.png`): left `FilterSidebar` (data-driven price slider + one toggleable group per `AttributeFacet`; `All` scope → price only; "Clear filters"); main "Products" grid of cards (image, name, brand, short description, price, discount badge); pagination footer; loading/empty/error states.
-- **Preview page** (`product_preview.png`): two-column — left image gallery (primary + vertical thumbnails, reflects selected variant); right category badge, dynamic attribute selector groups (derived from union of variant `attributes` keys — not hardcoded), name/brand/description, price + discount badge, stock status, Add to Cart / Buy buttons (wiring is a later feature). Selected-variant logic drives price/discount/stock/gallery; default to first variant.
-
-### Theme
-
-Project CSS variables only. Discount badge + price use accent; active page / Buy / selected pill use primary; unselected pills + Prev/Next bordered/surface. Cards: white surface, soft border, minimal shadow. Responsive: sidebar stacks above grid on mobile; preview columns stack.
-
-## Definition of Done (from spec)
-
-**Backend**
-
-- ☑ `UserModule` created (controller, service, DTO, types) + registered in `AppModule`
-- ☑ `GET /user` returns the authenticated profile incl. `phone`, no sensitive fields (`PROFILE_SELECT` excludes `password_hash`/internal flags)
-- ☑ `PATCH /user` updates only present whitelisted fields, returns updated profile; unknown keys → 400; email change preserves uniqueness (`P2002` + `meta.target` includes `email` → field error)
-- ☑ `DELETE /user` soft-deletes (`is_deleted`/`deleted_at`/`is_active=false`), clears auth cookie via `AuthService.clearSessionCookie`, never hard-deletes
-- ☑ Every operation runs the `isUserActive` precheck → 401 for inactive/soft-deleted
-- ☑ User identified via `@CurrentUser()` only (no client-supplied id); `PrismaService` only; no `any`; copy from `UserMessages`; validation uses the existing `{ errors: { field } }` envelope
-
-**Frontend**
-
-- ☑ `/profile` renders `ProfilePage` (placeholder removed), behind `RequireAuth` inside `MainLayout`
-- ☑ Left panel matches `profile_ui.png`; right "Addresses" panel is a dummy placeholder (static, `aria-hidden`)
-- ☑ Per-row inline edit (pencil → input + green tick → confirm) matches `profile_edit_ui.png`; success exits edit mode, shows new value + success message (Enter confirms / Esc cancels)
-- ☑ Field validation errors render under the row with reserved space (`profile_edit_error_ui.png`); message shows "Validation Failed", not "Something went wrong"
-- ☑ `userSlice`/`UserState` mirror the auth validation-failure model; all network logic in `userService.ts` (no `fetch` in components); `user` reducer registered
-- ☑ CSS Modules + theme variables only; `npm run lint` + `npm run build` clean (backend + frontend)
-
----
-
-## Prior Feature — Products Page UI Improvement: Discount Badge (spec: `005-ui-improvemnt-products-page.md`) — Done
-
-Branch `improvement/discount-badge-ui` (cut from `feature/products-browsing`). Small, screenshot-faithful CSS-only polish: the per-product discount on the listing card rendered as plain accent-coloured text; the prototype `products_page_clothing_category.png` shows it as a pill badge.
-
-- **Theme tokens added** (`frontend/src/styles/theme.css`): `--color-accent-subtle: rgba(255, 92, 53, 0.12)` (mirroring `--color-error-subtle`) and `--radius-pill: 999px`.
-- **`.cardBadge`** (`Products.module.css`) is now a pill — accent-subtle background, accent text, `padding: var(--space-1) var(--space-2)`, `border-radius: var(--radius-pill)`, `white-space: nowrap`; existing font size/weight + position unchanged. `.cardPriceRow` switched `align-items: baseline` → `center` so the padded pill sits level with the price.
-- Theme variables only. `formatDiscountBadge`, badge logic, API contract, Redux, routing, and the **detail page** discount are untouched (out of scope) — listing vs detail discount styling now differ by design.
-- **Verified:** frontend `npm run lint` + `npm run build` (tsc + vite) clean. Live visual confirmation at the two breakpoints still to be eyeballed (no browser-automation tooling here).
+(Earlier features — Product Browsing `004` + Access-Control Hardening, Discount Badge `005`, User Module `006`, Testing Suite — are summarised in **History** below.)
 
 ---
 
 ## Notes / decisions
 
-- Must consult before/while implementing: `project-overview.md`, `business-rules.md`, `development-rules.md`, `database-design.md`, `prisma-schema.md`. Screenshots are the source of truth under `.claude/screenshots/`: `profile_ui.png` (page layout — left "Manage Your Profile", right "Addresses" dummy), `profile_edit_ui.png` (row in edit mode: input + green tick + accent border), `profile_edit_error_ui.png` (field error under the row + toast).
-- **Reuse, don't rebuild:** `@CurrentUser()` → `AuthenticatedUser`, `JwtAuthGuard`, `AuthService.isUserActive(userId)`, `PrismaService`, the global validation exception factory (`{ errors: { field } }` envelope), and `ValidationMessages.phoneInvalid`/`emailInvalid` all already exist from `002`. The frontend feedback model (validation → `errors`, else → `message`, `startRequest`/`failRequest` helpers) is lifted from `authSlice`/`AuthState`.
-- **No schema migration** — `is_deleted`, `deleted_at`, and all editable columns already exist on `User`. Soft delete only; never hard-delete.
-- **`/user` adds `phone`** to the profile contract (the Profile page needs it); `/auth/me`'s `UserProfile` stays as-is. Unifying the two is explicitly out of scope.
-- **Identity from the token only** — every `/user` op acts on `@CurrentUser().id`; no body/param id is trusted (prevents acting on another account). `password_hash`/internal flags must never appear in a response `select`.
-- **`isUserActive` precheck on every op** — a JWT outlives logout / soft delete, so re-verify before reading or mutating (development-rules "Special Protection").
-- Follow established patterns: per-feature `types.ts` vs API-contract types in `src/types/`, `ApiResult<T>` service layer, typed `useAppDispatch`/`useAppSelector`, theme tokens in `src/styles/theme.css`, `VITE_API_URL` typed in `vite-env.d.ts`.
-- After completion run the relevant reviewers: `fyndit-security-reviewer` (ownership/`@CurrentUser` scoping, soft-delete cookie clear), `fyndit-prisma-reviewer` (selects/`P2002` handling), `fyndit-quality-reviewer`, `fyndit-ui-reviewer` (screenshot/theme/responsive), plus `fyndit-api-reviewer` + `fyndit-redux-reviewer` (referenced in CLAUDE.md but may not be registered here — cover those concerns manually if so).
+- Must consult before/while implementing: `project-overview.md`, `business-rules.md` (**Address Rules** + **Soft Delete Rules**), `development-rules.md`, `database-design.md`, `prisma-schema.md`. Screenshots are the source of truth under `.claude/screenshots/`: `address_add_form_ui.png` (blank Add form, `HOME` preselected), `address_update_form_ui.png` (pre-filled Edit form), `validation_error_address_update.png` (inline field error: red-bordered field + "↑ Invalid Zip Code", no toast). **No screenshot** for the list state or the Default badge / "Set as default" action — match the existing placeholder card chrome + theme tokens.
+- **Reuse, don't rebuild:** `@CurrentUser()` → `AuthenticatedUser`, `JwtAuthGuard`, `AuthService.isUserActive`/the `assertActiveUser` precheck, `PrismaService`, the `{ errors: { field } }` validation envelope, `ValidationMessages.zipInvalid`/`stateInvalid`/`countryInvalid`, `INDIAN_STATES`/`SUPPORTED_COUNTRY` (backend `constants/location.constant.ts`, frontend `constants/location.ts`), `@nestjs/mapped-types` `PartialType` for the update DTO, the ownership-scoped `updateMany`/`deleteMany` 404 pattern from `cart`. Frontend: the **cart** feedback model (react-toastify toasts via `.unwrap()`, `NetworkErrorMessages`/`NETWORK_ERROR_STATUS`, reset on session teardown) and the `ApiResult<T>` service layer.
+- **Schema migration IS required** (unlike the user module): add `is_removed Boolean @default(false)` + `is_default Boolean @default(false)` to `Address` (migration `address_is_removed_is_default`; migrations only — never `db push`). The model already had `removed_at`; `is_removed` is the new boolean flag the spec asked for. Soft delete only; never hard-delete.
+- **Identity + ownership from the token only** — every `/address` op acts on `@CurrentUser().id`; `:addressId` never establishes ownership on its own. Foreign/removed ids → 404 via ownership-scoped `updateMany`/`deleteMany` (`count === 0`). Response `select` excludes `user_id`/`is_removed`/`removed_at`.
+- **Transactions** for `POST` (count-check + create + first-is-default), `set-default` (unset others → set target), and `remove` (soft-delete → auto-promote the newest remaining active address) so the "exactly one default per user" invariant can't be raced.
+- **5-active-address limit** enforced server-side (`MAX_ACTIVE_ADDRESSES = 5` in `values.constant.ts`; 400 on the 6th); the frontend also hides "Add Address" once 5 active addresses exist (+ a short note).
+- **Default mechanics:** first active address auto-defaults; default is changed only from the list-card "Set as default" action (the add/edit forms carry no default control — screenshots are the source of truth). `is_default` is **not** a DTO field.
+- Follow established patterns: per-feature `types.ts` vs API-contract types in `src/types/`, typed `useAppDispatch`/`useAppSelector`, theme tokens in `src/styles/theme.css`, `VITE_API_URL` typed in `vite-env.d.ts`.
+- After completion run the reviewers: `fyndit-security-reviewer` (ownership/`@CurrentUser` scoping, transaction invariants), `fyndit-prisma-reviewer` (selects, migration, transactions), `fyndit-quality-reviewer`, `fyndit-ui-reviewer` (screenshot/theme/responsive).
 
 ## History
 
@@ -239,3 +169,14 @@ Branch `improvement/discount-badge-ui` (cut from `feature/products-browsing`). S
    - **Tests:** backend Jest unit (`cart.service.spec.ts`, 48) + Supertest e2e (`cart.e2e-spec.ts`); frontend Vitest/RTL (`cartSlice`, `CartPage`, `MainLayout` badge) + Playwright (`e2e/cart.spec.ts`). All green; both apps `npm run lint`/`build` clean. New testing pattern captured: Prisma `$transaction` mock for Serializable writes.
    - **Verified:** booted live and exercised in the browser per the user (cart page layout, stepper, toasts, badge, empty state, full-height footer) with iterative UI fixes against `cart_ui.png` / `empty_cart_ui.png`.
    - **Deferred (out of scope):** checkout/coupons/payments + the "Buy" action (next feature); pre-existing cross-cutting debt reaffirmed by reviewers — `ApiResult<T>` now duplicated across 4 services, `authSlice` inline `NETWORK_ERROR`, `ProductService` 403 vs cart/user 401 for inactive sessions.
+
+10. **Address Module — Backend Address Module + Frontend Profile Addresses** — *Done* (spec `008-address-module.md`). Branch `feature/address-module` (cut from `main`). Makes the Profile **Addresses** panel live: backend `address` module (get-all / add / update / soft-remove / set-default) + frontend `features/address/` + `components/Addresses/` (Panel/Card/Form) replacing the static placeholder. Bounded by **max 5 active addresses**; exactly one **default** per user.
+   - **Backend:** new `address/` module (controller, `AddressService`, `CreateAddressDto`/`UpdateAddressDto` = `PartialType`, `types/address.types.ts`) registered in `AppModule`; imports `AuthModule`. `GET /address` (active only, default-first then `created_at` desc), `POST /address` (`201`; 5-limit guard; first → default), `PATCH /address/:addressId` (present-keys-only update), `PATCH /address/:addressId/default` (transaction: unset others + set target; returns refreshed list), `DELETE /address/:addressId` (soft-remove + auto-promote). `JwtAuthGuard` + `assertActiveUser` precheck (401) on every op; identity from `@CurrentUser()` only; `:addressId` via `ParseUUIDPipe`. **Ownership-scoped `updateMany`/`findFirst` (`count === 0` → 404, never P2025/500); `ADDRESS_SELECT` excludes `user_id`/`is_removed`/`removed_at`.** Serializable `$transaction`s hold the "exactly one default" invariant (add, set-default, remove). `MAX_ACTIVE_ADDRESSES = 5` in `values.constant.ts`; new `AddressMessages`.
+   - **Schema:** added `is_removed Boolean @default(false)` + `is_default Boolean @default(false)` to `Address` (migration `address_is_removed_is_default`; migrations only). The model already had `removed_at`.
+   - **Confirmed decisions:** react-toastify for op success/errors + inline per-field validation; State = `INDIAN_STATES` dropdown, Country fixed India (disabled); first address (incl. the signup address) auto-defaults; removing the default auto-promotes the most-recently-created remaining active address; `is_default` never a DTO field; soft-delete only.
+   - **Review (Phase 5) fixes applied:** the **signup address is now created with `is_default: true`** (`auth.service.ts`) so the one-default invariant holds from account creation; set-default/remove writes use ownership-scoped `updateMany` (matching the cart pattern) rather than bare `update`.
+   - **Frontend:** `features/address/` (slice/service/types — `AddressState` `{ items, loading, saving, mutatingId, errors }`; toasts via `.unwrap()`, inline `errors` map for the form; resets on logout/sessionExpired/deleteUser), `components/Addresses/` (Panel list⇄form, Card with Default badge + Set-as-default, Form with type pills + inline errors), `types/address.types.ts`; `address` reducer registered; Profile right panel live. CSS Modules + theme tokens only.
+   - **Tests:** backend Jest unit (`address.service.spec.ts`, 44) + Supertest e2e (`address.e2e-spec.ts`); frontend Vitest/RTL (`addressSlice`, `AddressForm`, `AddressesPanel`) + Playwright (`e2e/address.spec.ts`, 30 — fully route-mocked). **All green: backend 152 unit / 139 e2e, frontend 258 unit / 30 e2e; both apps lint 0 errors + build clean.**
+   - **Test/lint cleanup this pass:** fixed 8 stale `address.service.spec.ts` tests (asserted `update`; impl uses ownership-scoped `updateMany`) + added the missing `mockTx.address.findMany`; cleared **all 84 backend lint errors** (pre-existing type-checked-lint debt across every spec) by typing supertest `res.body` to its contract + a `^_` unused-var eslint ignore pattern + `containing()`/`anyOf()` matcher wrappers — no rules disabled; removed stray `src/coverage-*` dirs and tightened `.gitignore`.
+   - **Self-improvement (Phase 6):** refined `business-rules.md` (Address default behavior + JWT re-check scope), `development-rules.md` (Address Write Patterns + transactions), `prisma-schema.md` (soft-delete pairs + Address columns), `database-design.md` (Address indexing), `testing-patterns.md` (4 new patterns), and a stale `ProfilePage.tsx` comment.
+   - **Deferred (out of scope):** checkout address selection (already reads addresses); composite `@@index([user_id, is_removed])`; the cross-cutting debt from entry 9 (`ApiResult<T>` duplication, `authSlice` inline `NETWORK_ERROR`, 403-vs-401 inconsistency) remains.

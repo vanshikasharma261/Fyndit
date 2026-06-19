@@ -21,6 +21,11 @@ import { AuthService } from '../src/auth/auth.service';
 import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { validationExceptionFactory } from '../src/common/validation/validation-exception.factory';
+import {
+  ProductListResponse,
+  ProductDetailResponse,
+  ProductFiltersResponse,
+} from '../src/product/types/product.types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -147,7 +152,10 @@ describe('ProductController (e2e)', () => {
     await app.init();
 
     jwtService = module.get<JwtService>(JwtService);
-    token = await jwtService.signAsync({ sub: TEST_USER_ID, email: TEST_EMAIL });
+    token = await jwtService.signAsync({
+      sub: TEST_USER_ID,
+      email: TEST_EMAIL,
+    });
   });
 
   afterAll(async () => {
@@ -169,12 +177,16 @@ describe('ProductController (e2e)', () => {
     });
 
     it('GET /product/detail/some-slug returns 401 without cookie', async () => {
-      const res = await request(app.getHttpServer()).get('/product/detail/some-slug');
+      const res = await request(app.getHttpServer()).get(
+        '/product/detail/some-slug',
+      );
       expect(res.status).toBe(401);
     });
 
     it('GET /product/All/filters returns 401 without cookie', async () => {
-      const res = await request(app.getHttpServer()).get('/product/All/filters');
+      const res = await request(app.getHttpServer()).get(
+        '/product/All/filters',
+      );
       expect(res.status).toBe(401);
     });
   });
@@ -196,7 +208,9 @@ describe('ProductController (e2e)', () => {
           price: decimal(500),
           discount: decimal(0),
           attributes: { color: 'blue' },
-          images: [{ image_url: '/img/1.jpg', is_primary: true, sort_order: 0 }],
+          images: [
+            { image_url: '/img/1.jpg', is_primary: true, sort_order: 0 },
+          ],
         },
       ],
     };
@@ -213,9 +227,15 @@ describe('ProductController (e2e)', () => {
         .set('Cookie', authCookie(token));
 
       expect(res.status).toBe(200);
-      expect(res.body.items).toHaveLength(1);
-      expect(res.body.items[0].product_id).toBe('p-1');
-      expect(res.body.meta).toMatchObject({ page: 1, limit: 12, total: 1, total_pages: 1 });
+      const body = res.body as ProductListResponse;
+      expect(body.items).toHaveLength(1);
+      expect(body.items[0].product_id).toBe('p-1');
+      expect(body.meta).toMatchObject({
+        page: 1,
+        limit: 12,
+        total: 1,
+        total_pages: 1,
+      });
     });
 
     it('returns 200 with empty items when no products match', async () => {
@@ -230,8 +250,9 @@ describe('ProductController (e2e)', () => {
         .set('Cookie', authCookie(token));
 
       expect(res.status).toBe(200);
-      expect(res.body.items).toHaveLength(0);
-      expect(res.body.meta.total).toBe(0);
+      const body = res.body as ProductListResponse;
+      expect(body.items).toHaveLength(0);
+      expect(body.meta.total).toBe(0);
     });
 
     it('returns 400 when page is 0 (min is 1)', async () => {
@@ -287,9 +308,10 @@ describe('ProductController (e2e)', () => {
         .set('Cookie', authCookie(token));
 
       expect(res.status).toBe(200);
-      expect(res.body.meta.page).toBe(2);
-      expect(res.body.meta.limit).toBe(5);
-      expect(res.body.meta.total_pages).toBe(20);
+      const body = res.body as ProductListResponse;
+      expect(body.meta.page).toBe(2);
+      expect(body.meta.limit).toBe(5);
+      expect(body.meta.total_pages).toBe(20);
     });
 
     it('money fields are serialized as 2-decimal strings', async () => {
@@ -303,8 +325,9 @@ describe('ProductController (e2e)', () => {
         .get('/product/All')
         .set('Cookie', authCookie(token));
 
-      expect(typeof res.body.items[0].price).toBe('string');
-      expect(res.body.items[0].price).toMatch(/^\d+\.\d{2}$/);
+      const body = res.body as ProductListResponse;
+      expect(typeof body.items[0].price).toBe('string');
+      expect(body.items[0].price).toMatch(/^\d+\.\d{2}$/);
     });
   });
 
@@ -320,7 +343,11 @@ describe('ProductController (e2e)', () => {
       brand: 'Apple',
       description: 'Flagship phone',
       is_active: true,
-      category: { category_id: 'cat-1', category_name: 'Electronics', slug: 'electronics' },
+      category: {
+        category_id: 'cat-1',
+        category_name: 'Electronics',
+        slug: 'electronics',
+      },
       variants: [
         {
           product_variant_id: 'v-001',
@@ -329,7 +356,9 @@ describe('ProductController (e2e)', () => {
           price: decimal(799),
           discount: decimal(50),
           attributes: { color: 'black', storage: '128GB' },
-          images: [{ image_url: '/img/1.jpg', alt_text: 'front', is_primary: true }],
+          images: [
+            { image_url: '/img/1.jpg', alt_text: 'front', is_primary: true },
+          ],
         },
       ],
     };
@@ -343,13 +372,17 @@ describe('ProductController (e2e)', () => {
         .set('Cookie', authCookie(token));
 
       expect(res.status).toBe(200);
-      expect(res.body.product_id).toBe('p-001');
-      expect(res.body.product_name).toBe('iPhone 16');
-      expect(res.body.variants).toHaveLength(1);
-      expect(res.body.variants[0].price).toBe('799.00');
-      expect(res.body.variants[0].discount).toBe('50.00');
-      expect(res.body.variants[0].stock).toBe(50);
-      expect(res.body.variants[0].attributes).toEqual({ color: 'black', storage: '128GB' });
+      const body = res.body as ProductDetailResponse;
+      expect(body.product_id).toBe('p-001');
+      expect(body.product_name).toBe('iPhone 16');
+      expect(body.variants).toHaveLength(1);
+      expect(body.variants[0].price).toBe('799.00');
+      expect(body.variants[0].discount).toBe('50.00');
+      expect(body.variants[0].stock).toBe(50);
+      expect(body.variants[0].attributes).toEqual({
+        color: 'black',
+        storage: '128GB',
+      });
     });
 
     it('returns 404 when product does not exist', async () => {
@@ -365,7 +398,10 @@ describe('ProductController (e2e)', () => {
 
     it('returns 404 when product is inactive (not visible per business rules)', async () => {
       seedActiveUser();
-      mockPrisma.product.findUnique.mockResolvedValue({ ...activeProduct, is_active: false });
+      mockPrisma.product.findUnique.mockResolvedValue({
+        ...activeProduct,
+        is_active: false,
+      });
 
       const res = await request(app.getHttpServer())
         .get('/product/detail/iphone-16')
@@ -375,7 +411,9 @@ describe('ProductController (e2e)', () => {
     });
 
     it('returns 401 without auth cookie', async () => {
-      const res = await request(app.getHttpServer()).get('/product/detail/iphone-16');
+      const res = await request(app.getHttpServer()).get(
+        '/product/detail/iphone-16',
+      );
       expect(res.status).toBe(401);
     });
 
@@ -418,12 +456,15 @@ describe('ProductController (e2e)', () => {
         .set('Cookie', authCookie(token));
 
       expect(res.status).toBe(200);
-      expect(res.body.price.min).toBe('100.00');
-      expect(res.body.price.max).toBe('2000.00');
-      expect(res.body.attributes).toHaveLength(1);
-      expect(res.body.attributes[0].name).toBe('color');
-      expect(res.body.attributes[0].label).toBe('Color');
-      expect(res.body.attributes[0].values).toEqual(expect.arrayContaining(['black', 'white']));
+      const body = res.body as ProductFiltersResponse;
+      expect(body.price.min).toBe('100.00');
+      expect(body.price.max).toBe('2000.00');
+      expect(body.attributes).toHaveLength(1);
+      expect(body.attributes[0].name).toBe('color');
+      expect(body.attributes[0].label).toBe('Color');
+      expect(body.attributes[0].values).toEqual(
+        expect.arrayContaining(['black', 'white']),
+      );
     });
 
     it('returns 200 with 0.00 prices when no products exist in scope', async () => {
@@ -443,9 +484,10 @@ describe('ProductController (e2e)', () => {
         .set('Cookie', authCookie(token));
 
       expect(res.status).toBe(200);
-      expect(res.body.price.min).toBe('0.00');
-      expect(res.body.price.max).toBe('0.00');
-      expect(res.body.attributes).toEqual([]);
+      const body = res.body as ProductFiltersResponse;
+      expect(body.price.min).toBe('0.00');
+      expect(body.price.max).toBe('0.00');
+      expect(body.attributes).toEqual([]);
     });
 
     it('returns 400 when search param exceeds max length', async () => {
@@ -458,7 +500,9 @@ describe('ProductController (e2e)', () => {
     });
 
     it('returns 401 without auth cookie', async () => {
-      const res = await request(app.getHttpServer()).get('/product/electronics/filters');
+      const res = await request(app.getHttpServer()).get(
+        '/product/electronics/filters',
+      );
       expect(res.status).toBe(401);
     });
 

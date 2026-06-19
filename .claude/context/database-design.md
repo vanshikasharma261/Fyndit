@@ -149,6 +149,13 @@ Cart
 
 - user_id
 
+Address
+
+- user_id (single index — currently defined)
+- [user_id, is_removed] (composite — deferred; recommended if the active-scope
+  `{ user_id, is_removed: false }` listing/count query becomes hot under the
+  Serializable add/set-default/remove transactions)
+
 ---
 
 # Money Handling

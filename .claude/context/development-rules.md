@@ -98,6 +98,10 @@ Transactions required for:
 - Payment Confirmation
 - Order Cancellation
 - Refund Processing
+- Add to cart (Serializable) — guards the 25-line / per-line quantity caps
+- Add address (Serializable) — guards the 5-active-address limit + first-is-default
+- Set default address (Serializable) — unset others then set target (exactly one default)
+- Remove address (Serializable) — soft-delete then auto-promote a replacement default
 
 Always use:
 
@@ -239,3 +243,12 @@ E2E specs in test/ must not import ConfigModule or the real AppModule. Instead: 
 - **Add to cart** is an atomic `upsert` on the `CartItem` compound unique key `@@unique([cart_id, product_variant_id])` (Prisma generated key `cart_id_product_variant_id`): create at quantity 1, otherwise `{ quantity: { increment: 1 } }`. The read → count/stock check → upsert runs inside `prisma.$transaction(cb, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable })` so concurrent adds cannot breach the 25-line cap (`MAX_CART_ITEMS`) or the per-line quantity ceiling (`MAX_CART_ITEM_QUANTITY`).
 - **Update / remove** scope the write by `cart_id` as well as `cart_item_id` using `updateMany` / `deleteMany`, and treat a `count === 0` result as a 404. This is both the ownership check (a user can only touch their own line) and a guard against a Prisma `P2025` (record-not-found) surfacing as a 500 when a line is removed mid-request.
 - Identity is always `@CurrentUser().id`; no cart or cart-item id is ever trusted from the body/params to establish ownership. Every cart op runs the `assertActiveUser` precheck (401) before any DB access.
+
+---
+
+## Address Write Patterns [address-module]
+
+- **Ownership-scoped writes** mirror the cart module: update / set-default / remove use `updateMany` scoped by `{ address_id, user_id, is_removed: false }` and treat `count === 0` as a 404 — both the ownership check and a guard against a Prisma `P2025` surfacing as a 500. Identity is always `@CurrentUser().id`; `:addressId` never establishes ownership on its own. `:addressId` is validated with `ParseUUIDPipe`.
+- **Active-scope helper:** every read/write filters on `{ user_id, is_removed: false }` (an `activeScope(userId)` helper). Removed rows are invisible everywhere and excluded from counts.
+- **The "exactly one default" invariant** is held inside Serializable `$transaction`s: add (count-check + create + first-is-default), set-default (unset all active defaults → set target), remove (soft-delete → promote the most-recently-created remaining active address when the removed row was the default). When a transactional method returns the refreshed list, it builds that list on the `tx` client inside the same transaction.
+- **Response select excludes ownership/internal columns.** Define a single `select` constant (e.g. `ADDRESS_SELECT`) listing only contract columns; never select `user_id`, `is_removed`, `removed_at`, or internal timestamps, so they cannot leak even after a refactor. `is_default` is set only by the service (auto-default / auto-promote / set-default), never from a create/update DTO.

@@ -24,6 +24,7 @@ import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { validationExceptionFactory } from '../src/common/validation/validation-exception.factory';
 import { AuthMessages } from '../src/constants/messages.constant';
 import { AddressType } from '../src/generated/prisma/enums';
+import { UserProfile } from '../src/auth/types/auth.types';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -161,7 +162,9 @@ describe('AuthController (e2e)', () => {
         async (fn: (tx: unknown) => Promise<void>) => {
           await fn({
             user: { create: jest.fn().mockResolvedValue({ user_id: 'u-1' }) },
-            address: { create: jest.fn().mockResolvedValue({ address_id: 'a-1' }) },
+            address: {
+              create: jest.fn().mockResolvedValue({ address_id: 'a-1' }),
+            },
             cart: { create: jest.fn().mockResolvedValue({ cart_id: 'c-1' }) },
           });
         },
@@ -285,8 +288,12 @@ describe('AuthController (e2e)', () => {
         .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toBe(AuthMessages.loginSuccessMessage);
-      expect(res.body.user).toMatchObject({ id: TEST_USER_ID, email: TEST_EMAIL });
+      const body = res.body as { message: string; user: UserProfile };
+      expect(body.message).toBe(AuthMessages.loginSuccessMessage);
+      expect(body.user).toMatchObject({
+        id: TEST_USER_ID,
+        email: TEST_EMAIL,
+      });
 
       const cookies = res.headers['set-cookie'];
       expect(cookies).toBeDefined();
@@ -361,7 +368,9 @@ describe('AuthController (e2e)', () => {
       expect(res.body).toEqual({ message: AuthMessages.logoutSuccessMessage });
 
       const cookies = res.headers['set-cookie'];
-      const cookieStr = Array.isArray(cookies) ? cookies.join('; ') : (cookies ?? '');
+      const cookieStr = Array.isArray(cookies)
+        ? cookies.join('; ')
+        : (cookies ?? '');
       expect(cookieStr).toContain('access_token');
     });
 

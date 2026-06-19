@@ -22,6 +22,7 @@ import { JwtStrategy } from '../src/auth/strategies/jwt.strategy';
 import { JwtAuthGuard } from '../src/auth/guards/jwt-auth.guard';
 import { validationExceptionFactory } from '../src/common/validation/validation-exception.factory';
 import { UserMessages } from '../src/constants/messages.constant';
+import { UserProfile } from '../src/user/types/user.types';
 
 // ---------------------------------------------------------------------------
 // Shared test constants
@@ -220,7 +221,8 @@ describe('UserController (e2e)', () => {
         .send({ first_name: 'Alicia' });
 
       expect(res.status).toBe(200);
-      expect(res.body.first_name).toBe('Alicia');
+      const body = res.body as UserProfile;
+      expect(body.first_name).toBe('Alicia');
     });
 
     it('returns 400 when email is not a valid email format', async () => {
@@ -327,7 +329,10 @@ describe('UserController (e2e)', () => {
         .set('Cookie', buildCookieHeader(validToken));
 
       expect(res.status).toBe(200);
-      const setCookie = res.headers['set-cookie'] as string[] | string | undefined;
+      const setCookie = res.headers['set-cookie'] as
+        | string[]
+        | string
+        | undefined;
       const cookieStr = Array.isArray(setCookie)
         ? setCookie.join('; ')
         : (setCookie ?? '');

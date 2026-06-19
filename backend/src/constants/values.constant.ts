@@ -28,6 +28,13 @@ export const MAX_CART_ITEMS = 25;
 export const MAX_CART_ITEM_QUANTITY = 20;
 
 /**
+ * Maximum number of active (non-removed) addresses a single user may keep.
+ * Adding a sixth is refused (400); soft-removed addresses don't count toward
+ * this limit. Enforced in `AddressService`.
+ */
+export const MAX_ACTIVE_ADDRESSES = 5;
+
+/**
  * Curated navbar scopes that are not real category slugs but span specific
  * child categories. Keyed by the lower-cased path param.
  */

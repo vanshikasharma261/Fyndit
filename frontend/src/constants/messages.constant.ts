@@ -38,6 +38,39 @@ export const CartMessages = {
   genericError: "Something went wrong. Please try again.",
 } as const;
 
+export const AddressMessages = {
+  /** Panel heading (shared by list + form modes). */
+  heading: "Addresses",
+  /** Add-address button + blank-form title. */
+  addAddress: "Add Address",
+  /** Shown in place of the Add button once the limit is reached. */
+  limitNote: "You can save up to 5 addresses.",
+  /** Empty list copy. */
+  empty: "No addresses saved yet.",
+  /** Shown while the list is loading. */
+  loading: "Loading…",
+  /** Badge on the default address card + the set-default action. */
+  defaultBadge: "Default",
+  setDefault: "Set as default",
+  /** Address card meta labels. */
+  cityLabel: "City",
+  stateLabel: "State",
+  zipLabel: "Zip Code",
+  /** Form button labels. */
+  saveAdd: "Add",
+  saveUpdate: "Update",
+  cancel: "Cancel",
+  /** Toast copy for successful operations. */
+  addSuccess: "Address added",
+  updateSuccess: "Address updated",
+  removeSuccess: "Address removed",
+  defaultSuccess: "Default address updated",
+  /** Toast copy for a 400 validation failure (per-field errors render inline). */
+  validationFailed: "Validation Failed",
+  /** Fallback when a non-validation request fails without a server message. */
+  genericError: "Something went wrong. Please try again.",
+} as const;
+
 export const AuthGateMessages = {
   /** Shown while the initial `GET /auth/me` session check is in flight. */
   checkingSession: "Loading…",

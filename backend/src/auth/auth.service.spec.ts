@@ -1,8 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import {
-  ConflictException,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { ConflictException, UnauthorizedException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -51,7 +48,10 @@ const mockConfigService = {
 const mockRes = {
   cookie: jest.fn(),
   clearCookie: jest.fn(),
-} as unknown as import('express').Response;
+} as unknown as import('express').Response & {
+  cookie: jest.Mock;
+  clearCookie: jest.Mock;
+};
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -108,7 +108,9 @@ describe('AuthService', () => {
         async (fn: (tx: unknown) => Promise<void>) => {
           const tx = {
             user: { create: jest.fn().mockResolvedValue({ user_id: 'u-1' }) },
-            address: { create: jest.fn().mockResolvedValue({ address_id: 'a-1' }) },
+            address: {
+              create: jest.fn().mockResolvedValue({ address_id: 'a-1' }),
+            },
             cart: { create: jest.fn().mockResolvedValue({ cart_id: 'c-1' }) },
           };
           await fn(tx);
@@ -137,14 +139,16 @@ describe('AuthService', () => {
         async (fn: (tx: unknown) => Promise<void>) => {
           const tx = {
             user: {
-              create: jest.fn().mockImplementation(
-                (args: { data: typeof capturedData }) => {
+              create: jest
+                .fn()
+                .mockImplementation((args: { data: typeof capturedData }) => {
                   capturedData = args.data;
                   return { user_id: 'u-1' };
-                },
-              ),
+                }),
             },
-            address: { create: jest.fn().mockResolvedValue({ address_id: 'a-1' }) },
+            address: {
+              create: jest.fn().mockResolvedValue({ address_id: 'a-1' }),
+            },
             cart: { create: jest.fn().mockResolvedValue({ cart_id: 'c-1' }) },
           };
           await fn(tx);
@@ -170,14 +174,18 @@ describe('AuthService', () => {
         async (fn: (tx: unknown) => Promise<void>) => {
           const tx = {
             user: {
-              create: jest.fn().mockImplementation(
-                (args: { data: typeof capturedUserData }) => {
-                  capturedUserData = args.data;
-                  return { user_id: 'u-1' };
-                },
-              ),
+              create: jest
+                .fn()
+                .mockImplementation(
+                  (args: { data: typeof capturedUserData }) => {
+                    capturedUserData = args.data;
+                    return { user_id: 'u-1' };
+                  },
+                ),
             },
-            address: { create: jest.fn().mockResolvedValue({ address_id: 'a-1' }) },
+            address: {
+              create: jest.fn().mockResolvedValue({ address_id: 'a-1' }),
+            },
             cart: { create: jest.fn().mockResolvedValue({ cart_id: 'c-1' }) },
           };
           await fn(tx);
@@ -290,7 +298,10 @@ describe('AuthService', () => {
     it('marks the user inactive and clears the cookie', async () => {
       mockPrisma.user.update.mockResolvedValue({ user_id: 'u-1' });
 
-      const result = await service.logout({ id: 'u-1', email: 'a@b.com' }, mockRes);
+      const result = await service.logout(
+        { id: 'u-1', email: 'a@b.com' },
+        mockRes,
+      );
 
       expect(result).toEqual({ message: AuthMessages.logoutSuccessMessage });
       expect(mockPrisma.user.update).toHaveBeenCalledWith(

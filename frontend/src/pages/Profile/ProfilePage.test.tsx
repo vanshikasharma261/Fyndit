@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { renderWithProviders } from "../../test/renderWithProviders";
 import ProfilePage from "./ProfilePage";
@@ -55,7 +55,13 @@ describe("ProfilePage — rendering", () => {
     // Delay resolution so loading state is visible
     mockUserService.get.mockReturnValue(new Promise(() => {}));
     renderWithProviders(<ProfilePage />);
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    // Scope to the profile section — the Addresses panel also renders a
+    // "Loading…" while its own fetch is in flight, so an unscoped query is
+    // ambiguous under RTL strict mode.
+    const profileSection = screen
+      .getByRole("heading", { name: "Manage Your Profile" })
+      .closest("section")!;
+    expect(within(profileSection).getByText("Loading…")).toBeInTheDocument();
   });
 
   it("displays profile field labels after data loads", async () => {
