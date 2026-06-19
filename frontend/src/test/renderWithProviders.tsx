@@ -9,12 +9,16 @@ import productsReducer from "../features/products/productsSlice";
 import userReducer from "../features/user/userSlice";
 import cartReducer from "../features/cart/cartSlice";
 import addressReducer from "../features/address/addressSlice";
+import checkoutReducer from "../features/checkout/checkoutSlice";
+import orderReducer from "../features/order/orderSlice";
 import type { RootState } from "../store/store";
 
 /**
  * Reducer map mirroring the real store (`src/store/store.ts`). Combined up front
  * so `configureStore` accepts a partial `preloadedState` (RTK 2 dropped the old
  * `PreloadedState<RootState>` type).
+ *
+ * checkout and order reducers added for feature/checkout-order tests.
  */
 const rootReducer = combineReducers({
   auth: authReducer,
@@ -22,6 +26,8 @@ const rootReducer = combineReducers({
   user: userReducer,
   cart: cartReducer,
   address: addressReducer,
+  checkout: checkoutReducer,
+  order: orderReducer,
 });
 
 /** Creates a fresh test store with optional preloaded state slices. */

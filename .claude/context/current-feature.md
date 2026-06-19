@@ -1,61 +1,73 @@
 ## Current Feature
 
-**Address Module — Backend Address Module + Frontend Profile Addresses** (spec: `008-address-module.md`)
+**Checkout, Orders & Payments (COD + Stripe)** (spec: `009-checkout-order.md`)
 
-Branch: `feature/address-module` (cut from `main`).
+Branch: `feature/checkout-order` (cut from `main`).
 
-Makes the Profile page **Addresses** panel live. A backend `address` module owns get-all / add / update / soft-remove / set-default; the frontend `features/address/` + `components/Addresses/` replace the static placeholder with a list ⇄ add/edit form. Bounded by **max 5 active addresses per user**; exactly one **default** (first address auto-default; "Set as default" from the list; removing the default auto-promotes the newest remaining). Screenshots are the source of truth (`address_add_form_ui.png`, `address_update_form_ui.png`, `validation_error_address_update.png`).
+The full purchase flow from the cart's CHECKOUT button to a placed, reviewable, cancellable order. Backend adds three modules — `payment` (`StripeService`, leaf), `checkout` (summary + coupon apply/remove + create-payment-intent, with `CouponService`), and `order` (place-COD / list / detail / cancel + the `/payment/webhook` controller). **COD** places immediately (payment `PENDING`); **card** creates a Stripe PaymentIntent (context in metadata) and the order is placed by the `payment_intent.succeeded` **webhook** (payment `PAID`); **cancel** restocks synchronously for COD and via a **real, webhook-driven Stripe refund** (`charge.refunded`) for paid orders. Frontend adds `@stripe/*`, the `checkout` + `order` features, the Checkout page (COD + Stripe Elements), Orders history (replaces the placeholder) and Order detail. **No schema migration** — every model already exists. Screenshots are the source of truth (`checkout_cod_ui.png`, `checkout_stripe_ui.png`, `stripe_payment_ui.png`, `order_history_ui.png`, `order_detail_ui.png`).
 
 ## Status
 
-**Done** — all 7 workflow phases complete (spec approved → implemented → tested → reviewed → context refined → finalized). See History entry 10. Ready for commit + PR.
+**Done** — all 7 workflow phases complete (spec approved → implemented → tested → reviewed → context refined → finalized). See History entry 11. Ready for commit + PR.
 
 ## Goal
 
-Deliver end-to-end address management for the authenticated user. Backend: a feature-isolated `address` module mirroring `cart`/`user` conventions (thin controller, logic in `AddressService`, `PrismaService` only, no `any`, response contracts in `address/types/`, copy in a new `AddressMessages` group, `JwtAuthGuard` + `assertActiveUser` precheck on every op; identity from `@CurrentUser()` only; ownership-scoped writes → 404 on foreign/removed ids). Frontend: `features/address/` slice/service/types + `components/Addresses/` (Panel/Card/Form) rendered in the Profile page right card, mirroring the cart/user architecture. See `specs/008-address-module.md` for the full Definition of Done.
+Deliver checkout + orders + payments end-to-end. Backend: feature-isolated `payment` / `checkout` / `order` modules (thin controllers, logic in services, `PrismaService` only, no `any`, contracts in each module's `types/`, copy in new `CheckoutMessages`/`OrderMessages`/`CouponMessages`, `JwtAuthGuard` + `assertActiveUser` on every authenticated op; identity from `@CurrentUser()` only; ownership-scoped reads/writes → 404 on foreign ids; Serializable `$transaction`s for all placement/cancel/refund). Stripe via the `stripe` SDK (PaymentIntent + signed webhook + refund); `main.ts` `rawBody: true`. Frontend: `features/checkout/` + `features/order/` (slice/service/types) mirroring the cart/address architecture, Stripe Elements `<PaymentElement/>`, the Checkout/Orders/OrderDetail pages, and the cart→checkout + navbar Orders wiring. See `specs/009-checkout-order.md` for the full Definition of Done.
 
 ## Scope / Plan
 
 ### Confirmed decisions
 
-1. **Feedback — react-toastify for op success/errors (add/update/remove/set-default); inline per-field validation errors** under each form field (red border + message), matching `validation_error_address_update.png`.
-2. **State = `INDIAN_STATES` dropdown; Country fixed India (disabled).** Backend `@IsIn(INDIAN_STATES)` + `@IsIn([SUPPORTED_COUNTRY])`, identical to signup. Frontend reuses `constants/location.ts`.
-3. **Default address in scope** (`is_default` column). First address auto-default; "Set as default" from the list card (forms unchanged); the default card shows a "Default" badge; setting a new default unsets the previous in a transaction.
-4. **Removing the default auto-promotes the most-recently-created remaining active address** (same transaction).
-5. **5-active-address limit**: backend rejects a 6th (`BadRequestException`, `MAX_ACTIVE_ADDRESSES = 5`); frontend hides "Add Address" at 5 (+ note).
-6. **Soft delete only**: remove sets `is_removed = true` + `removed_at = now()`; removed rows never list and don't count toward the limit.
-7. **Schema change approved**: add `is_removed Boolean @default(false)` + `is_default Boolean @default(false)` to `Address` (migration `address_is_removed_is_default`; migrations only).
+1. **Invoice email/PDF deferred** — no `mail` module this feature.
+2. **Cancel of a paid order = real Stripe refund, webhook-driven** (`charge.refunded` → CANCELLED + payment REFUNDED + restock + coupon release, idempotent). COD/unpaid cancel is synchronous (CANCELLED + restock + coupon release in one Serializable txn).
+3. **Coupon = full enforcement** — active / not-expired / min-order / `usage_limit`, plus one-use-per-user via `CouponUsage` (+ `used_count` increment) on placement; **released on cancel**. Coupon re-verified on every `GET /checkout`; invalid coupon cleared from `cart.applied_coupon`.
+4. **Stripe context in PaymentIntent metadata** (`user_id`, `address_id`, `coupon_code`); order created **only** in the webhook on success; idempotency via unique `Payment.stripe_payment_id`. Stock-fail in webhook → auto-refund, no order (D7).
+5. **Shipping** = ₹100 when **pre-coupon `sub_total` < ₹500**, else free.
+6. **No schema migration** (D1). Display Order ID (`#A2224894`) derived from `order_id` (first 8 hex chars, upper-cased). Money as `"0.00"` strings; FE renders 2dp Indian grouping (`formatMoney`) — distinct from the rounded `formatPrice` on listings (D2). `purchase_price` = final unit price `max(0, price − variant.discount)`; checkout "Discount" line is coupon-only (D3). Out-of-stock = `stock === 0` (overlay + excluded); placement re-validates `stock >= qty` (D4). Order item brand/image/attributes read live from the variant; only name + price snapshotted (D5). "Add Address" on checkout = inline `AddressForm` reuse (D6).
 
-### Backend — `address` module (`backend/src/address/`)
+### Backend — `payment` / `checkout` / `order` (`backend/src/`)
 
 ```
-backend/src/address/
-├── address.module.ts          // imports AuthModule; PrismaModule is global
-├── address.controller.ts      // @UseGuards(JwtAuthGuard); @CurrentUser() only
-├── address.service.ts
-├── dto/{create-address,update-address}.dto.ts   // update = PartialType(create)
-└── types/address.types.ts
+payment (leaf) ──exports StripeService
+   ▲   ▲
+   │   └── checkout ──exports CheckoutService, CouponService
+   │          ▲
+   └── order ─┘     (order imports payment + checkout)
 ```
 
-Register `AddressModule` in `AppModule`. Every op runs `assertActiveUser` (401) before any DB access; user id from the JWT only; ownership-scoped `updateMany`/`deleteMany`-style writes (`count === 0` → 404). Endpoints: `GET /address` (active only, default-first), `POST /address` (`201`; 5-limit guard; first → default), `PATCH /address/:addressId` (present-keys-only update), `PATCH /address/:addressId/default` (transaction: unset others + set target; returns refreshed list), `DELETE /address/:addressId` (soft-remove + auto-promote). `:addressId` via `ParseUUIDPipe`. New `AddressMessages` group; `MAX_ACTIVE_ADDRESSES = 5` in `values.constant.ts`. Contract: `AddressResponse` (address_id, address_type, line1, line2, city, state, country, zip, is_default — no sensitive cols).
+- **`payment`** — `StripeService` (createPaymentIntent, retrievePaymentIntent, createRefund, constructWebhookEvent). `ConfigService` only.
+- **`checkout`** — `CheckoutService` + `CouponService` + controller: `GET /checkout`, `POST`/`DELETE /checkout/coupon`, `POST /checkout/payment-intent`.
+- **`order`** — `OrderService` + controller (`POST /order` COD, `GET /order` paginated, `GET /order/:orderId`, `PATCH /order/:orderId/cancel`) + `OrderWebhookController` (`POST /payment/webhook`: `payment_intent.succeeded` → place; `charge.refunded` → finalize refund).
 
-### Frontend — Profile Addresses panel
+Register all three in `AppModule`. Add `stripe` dep; `NestFactory.create(..., { rawBody: true })`; Stripe env keys via `getOrThrow`. `SHIPPING_FEE`/`FREE_SHIPPING_THRESHOLD` in `values.constant.ts`. Contracts: `CheckoutSummary`/`CheckoutItem`/`AppliedCoupon`, `OrderListItem`/`OrderItemView`/`OrderDetail`.
+
+### Frontend — checkout + order
 
 ```
 frontend/src/
-├── features/address/{addressSlice.ts, addressService.ts, types.ts}   // AddressState
-├── types/address.types.ts                                            // API contracts
-├── components/Addresses/{AddressesPanel,AddressCard,AddressForm}.tsx + *.module.css
-├── pages/Profile/ProfilePage.tsx     // render <AddressesPanel/> (placeholder removed)
-└── store/store.ts                    // register `address` reducer
+├── features/checkout/{checkoutSlice,checkoutService,types}.ts
+├── features/order/{orderSlice,orderService,types}.ts
+├── types/{checkout.types,order.types}.ts
+├── pages/Checkout/CheckoutPage.tsx (+ .module.css)        // /checkout
+├── pages/Orders/{OrdersPage,OrderDetailPage}.tsx (+ css)  // /orders, /orders/:orderId
+├── services/stripe.ts            // memoised loadStripe
+├── routes/router.tsx             // add /checkout, /orders (real), /orders/:orderId
+├── store/store.ts                // register checkout + order reducers
+├── utils/format.ts               // formatMoney, formatOrderNumber
+└── vite-env.d.ts                 // VITE_STRIPE_PUBLISHABLE_KEY
 ```
 
-- `addressService.ts` — all `fetch` (`credentials: "include"`, `ApiResult<T>`): `list`, `add`, `update`, `remove`, `setDefault`.
-- `addressSlice.ts` — thunks `fetchAddresses` / `addAddress` / `updateAddress` / `removeAddress` / `setDefaultAddress`; branch on `ok`; synthetic `NETWORK_ERROR`; `errors` holds the per-field form map (inline); op feedback via `.unwrap()` toasts in the component (Cart pattern). Reset on logout/sessionExpired/deleteUser. `AddressState`: `{ items, loading, saving, mutatingId, errors }`.
-- `AddressesPanel` — list mode (cards + dashed "Add Address", hidden at 5) ⇄ form mode (blank add / pre-filled edit) within the right Profile card.
-- `AddressForm` — `ADDRESS TYPE` pills (HOME default), line1/line2/city, State (`INDIAN_STATES` dropdown), Country (India disabled), zip; Cancel + Add/Update; inline field errors with reserved height.
-- `AddressCard` — type badge, lines, City/State, zip chip, "Default" badge, pencil/trash + "Set as default" action.
+- Deps `@stripe/stripe-js` + `@stripe/react-stripe-js`; `VITE_STRIPE_PUBLISHABLE_KEY` in `frontend/.env`.
+- `checkoutSlice`/`orderSlice` follow the cart pattern (`ApiResult<T>`, `NETWORK_ERROR`, toasts via `.unwrap()`, reset on logout/sessionExpired/deleteUser); 401 handled by the existing `authExpiryMiddleware`.
+- Checkout page matches the 3 checkout screenshots (read-only personal info, address picker + inline Add, COD/Card radios, shopping bag, promo code apply/remove, out-of-stock overlay). COD → place + redirect to `/orders/:id`; card → create-intent → `<Elements><PaymentElement/></Elements>` → confirm → `/orders`. On placement: `dispatch(fetchCart())` to reset the badge.
+- Orders page (replaces placeholder) + Order detail per screenshots (+ status/totals/address extras on detail — D, approved). Cart CHECKOUT → `navigate('/checkout')`.
 - CSS Modules + theme tokens only; responsive.
+
+---
+
+## Prior Feature — Address Module (Backend Address Module + Frontend Profile Addresses) (spec: `008-address-module.md`) — Done
+
+Made the Profile **Addresses** panel live: backend `address` module (get-all / add / update / soft-remove / set-default) + frontend `features/address/` + `components/Addresses/`. Bounded by **max 5 active addresses**; exactly one **default** per user (first auto-default; "Set as default"; removing the default auto-promotes the newest remaining). `AddressService.findOwnedAddress` + the `addressSlice`/`AddressForm` are reused by this checkout feature. (Full details in **History** entry 10.)
 
 ---
 
@@ -180,3 +192,13 @@ Full cart experience: a backend `cart` module (view / add / update-qty / remove)
    - **Test/lint cleanup this pass:** fixed 8 stale `address.service.spec.ts` tests (asserted `update`; impl uses ownership-scoped `updateMany`) + added the missing `mockTx.address.findMany`; cleared **all 84 backend lint errors** (pre-existing type-checked-lint debt across every spec) by typing supertest `res.body` to its contract + a `^_` unused-var eslint ignore pattern + `containing()`/`anyOf()` matcher wrappers — no rules disabled; removed stray `src/coverage-*` dirs and tightened `.gitignore`.
    - **Self-improvement (Phase 6):** refined `business-rules.md` (Address default behavior + JWT re-check scope), `development-rules.md` (Address Write Patterns + transactions), `prisma-schema.md` (soft-delete pairs + Address columns), `database-design.md` (Address indexing), `testing-patterns.md` (4 new patterns), and a stale `ProfilePage.tsx` comment.
    - **Deferred (out of scope):** checkout address selection (already reads addresses); composite `@@index([user_id, is_removed])`; the cross-cutting debt from entry 9 (`ApiResult<T>` duplication, `authSlice` inline `NETWORK_ERROR`, 403-vs-401 inconsistency) remains.
+
+11. **Checkout, Orders & Payments (COD + Stripe)** — *Done* (spec `009-checkout-order.md`). Branch `feature/checkout-order` (cut from `main`). The full purchase flow: cart CHECKOUT → checkout page → placed/reviewable/cancellable order, with Cash-on-Delivery and Stripe card payment.
+   - **Backend:** three new modules registered in `AppModule`, acyclic graph `payment` (leaf, `StripeService`) → `checkout` (`CheckoutService` + `CouponService` + controller) → `order` (`OrderService` + `/order` controller + `/payment/webhook` controller). `GET /checkout` (summary; out-of-stock lines flagged + excluded; coupon re-verified every read and cleared from the cart if invalid), `POST`/`DELETE /checkout/coupon`, `POST /checkout/payment-intent`. `POST /order` (COD), `GET /order` (paginated, page 10), `GET /order/:id`, `PATCH /order/:id/cancel`. `JwtAuthGuard` + `assertActiveUser` on every authenticated op; identity from `@CurrentUser()`; `:orderId` via `ParseUUIDPipe`; ownership-scoped reads (foreign id → 404). `CheckoutService.buildOrderContext` is the single authoritative breakdown shared by display + COD/Stripe placement so they can't diverge. Money as `"0.00"` strings.
+   - **Flows / decisions (Phase-1 Q&A):** COD places immediately (payment `PENDING`). Card → PaymentIntent with checkout context in **metadata**; the order is placed by the `payment_intent.succeeded` **webhook** (payment `PAID`), idempotent, with auto-refund + no-order if stock vanished. Cancel: COD synchronous (CANCELLED + restock + coupon release); Stripe-paid → real refund finalized by the `charge.refunded` webhook. Shipping ₹100 when **pre-coupon subtotal < ₹500**, else free. Coupon **full enforcement** (active/expiry/min-order/usage-limit + one-use-per-user via `CouponUsage` + `used_count`), **released on cancel**. Invoice email/PDF **deferred**.
+   - **Schema:** migration **`order_coupon_ref`** adds a nullable `Order.coupon_id` FK (+ `Coupon.orders`) — the one deviation from the planned "no migration", chosen during review so cancellation can release the coupon (the `Order` had no other link). `main.ts` now boots with `{ rawBody: true }` for Stripe signature verification. New deps: backend `stripe`; frontend `@stripe/stripe-js` + `@stripe/react-stripe-js`. Stripe test keys in `backend/.env` / `frontend/.env` (gitignored).
+   - **Frontend:** `features/checkout/` + `features/order/` (slice/service/types, `ApiResult<T>` + toasts via `.unwrap()`, reset on session teardown), `pages/Checkout/` (CheckoutPage + `StripeCardForm` with `<Elements>`/`<PaymentElement>`), `pages/Orders/` (OrdersPage history table replacing the placeholder + OrderDetailPage), `services/stripe.ts` (memoised `loadStripe`), routes `/checkout` + `/orders` + `/orders/:orderId`, cart CHECKOUT wired, `formatMoney`/`formatOrderNumber`/`formatOrderDate` utils, two new theme tokens. CSS Modules + tokens only; responsive.
+   - **Tests:** backend Jest unit (`checkout`/`coupon`/`order`/`stripe` specs) + Supertest e2e (`checkout` incl. webhook, `order`); frontend Vitest/RTL (checkout/order slices, CheckoutPage, OrdersPage, format utils) + Playwright (`e2e/checkout-orders.spec.ts`, 38 — fully route-mocked, Stripe mocked). **All green: backend 272 unit / 205 e2e, frontend 388 unit / 38 e2e; both apps lint 0 errors + build clean.** Test-only fixes during testing: webhook e2e needed `Content-Type: application/json` (so `rawBody` fills), Playwright route glob `/order*` (match `?page=1`), `getByText(..,{exact})` (substring collision), and UUID-shaped webhook metadata after the validation hardening.
+   - **Review (Phase 5) fixes applied (user-approved):** added the `order_coupon_ref` migration + coupon release on cancel (`CouponService.releaseUsage`, called in `restockAndCancel`); **narrowed the `placeStripeOrder` catch** to refund only on `BadRequestException` (a duplicate `P2002`/serialization `P2034` no longer erroneously refunds a placed order — re-thrown so Stripe retries); UUID-validate webhook metadata; `@HttpCode(200)` on cancel; de-duped the double `assertActiveUser` in coupon apply/remove (`composeSummary`); FE: `creatingIntent` flag (guards double-tap PaymentIntents), Stripe `processing` status handled, stable `order_item_id` keys, attribute spacing, coupon Enter-to-apply + aria-label, hardcoded colors → new `--color-overlay-dark`/`--color-primary-light-subtle` tokens, `<th scope>`, radio `value` attrs, narrow-screen table treatment, focus-visible states.
+   - **Self-improvement (Phase 6):** refined `prisma-schema.md` + `database-design.md` (Order↔Coupon), `business-rules.md` (coupon lifecycle + shipping fee + Stripe webhook placement + cancellation mechanics), `development-rules.md` (module graph + Stripe webhook rules), `testing-patterns.md` (4 new patterns: webhook rawBody/Content-Type, `$transaction` callback-vs-array mocks, Playwright route globs + exact-text), and corrected the 009 spec's migration note.
+   - **Deferred (out of scope / follow-ups from review):** invoice email + PDF; `@@unique([stripe_payment_id])` migration (DB-level idempotency, currently app-guarded); `@@index([user_id, created_at])` for order history; single-query order detail; cross-cutting debt (`ApiResult<T>` now 5×, `assertActiveUser` 6×, `pickPrimaryImage`/`asAttributeRecord` 4×) — extraction recommended in a dedicated cleanup pass.

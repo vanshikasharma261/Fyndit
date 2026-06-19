@@ -7,6 +7,8 @@
  */
 interface ImportMetaEnv {
   readonly VITE_API_URL: string;
+  /** Stripe publishable (test) key — drives the Elements card payment form. */
+  readonly VITE_STRIPE_PUBLISHABLE_KEY: string;
 }
 
 interface ImportMeta {

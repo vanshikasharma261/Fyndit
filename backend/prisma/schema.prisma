@@ -268,6 +268,7 @@ model Coupon {
   created_at DateTime @default(now())
 
   usages CouponUsage[]
+  orders Order[]
 
   @@index([code])
 }
@@ -286,8 +287,11 @@ model CouponUsage {
 model Order {
   order_id String @id @default(uuid()) @db.Uuid
 
-  user_id    String @db.Uuid
-  address_id String @db.Uuid
+  user_id    String  @db.Uuid
+  address_id String  @db.Uuid
+  // The coupon applied at placement (if any). Lets cancellation release the
+  // per-user CouponUsage + decrement used_count; the Order has no other link.
+  coupon_id  String? @db.Uuid
 
   sub_total       Decimal @db.Decimal(10, 2)
   coupon_discount Decimal @db.Decimal(10, 2)
@@ -301,6 +305,7 @@ model Order {
 
   user    User    @relation(fields: [user_id], references: [user_id])
   address Address @relation(fields: [address_id], references: [address_id])
+  coupon  Coupon? @relation(fields: [coupon_id], references: [coupon_id])
 
   items   OrderItem[]
   payment Payment?

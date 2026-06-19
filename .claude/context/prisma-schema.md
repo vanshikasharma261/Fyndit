@@ -429,6 +429,7 @@ expires_at DateTime?
 created_at DateTime @default(now())
 
 usages CouponUsage[]
+orders Order[]
 }
 
 model CouponUsage {
@@ -446,6 +447,10 @@ order_id String @id @default(uuid()) @db.Uuid
 
 user_id String @db.Uuid
 address_id String @db.Uuid
+// Coupon applied at placement (nullable). Lets cancellation release the
+// per-user CouponUsage + decrement used_count — the Order has no other link.
+// Added in migration `order_coupon_ref`.
+coupon_id String? @db.Uuid
 
 sub_total Decimal @db.Decimal(10,2)
 coupon_discount Decimal @db.Decimal(10,2)
@@ -459,12 +464,15 @@ updated_at DateTime @updatedAt
 
 user User @relation(fields: [user_id], references: [user_id])
 address Address @relation(fields: [address_id], references: [address_id])
+coupon Coupon? @relation(fields: [coupon_id], references: [coupon_id])
 
 items OrderItem[]
 payment Payment?
 
 @@index([user_id])
+@@index([address_id])
 @@index([status])
+@@index([created_at])
 }
 
 model OrderItem {

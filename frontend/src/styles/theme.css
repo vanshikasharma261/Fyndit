@@ -31,6 +31,12 @@
   /* Accent tint (soft accent-on-surface fill, e.g. discount badge) */
   --color-accent-subtle: rgba(255, 92, 53, 0.12);
 
+  /* Primary-light tint (soft primary fill, e.g. in-progress status pills) */
+  --color-primary-light-subtle: rgba(36, 52, 96, 0.12);
+
+  /* Dark scrim for media overlays (e.g. out-of-stock product image) */
+  --color-overlay-dark: rgba(17, 26, 48, 0.65);
+
   /* Feedback */
   --color-error: #dc2626;
   --color-success: #16a34a;

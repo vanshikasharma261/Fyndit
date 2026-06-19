@@ -8,7 +8,11 @@ import { AppModule } from './app.module';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // `rawBody: true` preserves the unparsed request body (`req.rawBody`) so the
+  // Stripe webhook can verify the signature against the exact bytes Stripe sent.
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    rawBody: true,
+  });
   const config = app.get(ConfigService);
 
   // Serve downloaded product images. The seeder stores relative paths like

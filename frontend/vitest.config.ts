@@ -16,5 +16,8 @@ export default defineConfig({
   },
   define: {
     "import.meta.env.VITE_API_URL": JSON.stringify("http://localhost:3000"),
+    "import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY": JSON.stringify(
+      "pk_test_fake_key_for_tests",
+    ),
   },
 });

@@ -186,3 +186,35 @@ Also applies to ignored catch params (`catch (_e)`).
 ## Assert Ownership-Scoped Writes as `updateMany`, Not `update` [address-module]
 
 Service methods that mutate user-owned resources use ownership-scoped `updateMany` (scoped by `{ id, user_id, is_removed: false }`, `count === 0` → 404) — never bare `update` (which would surface a foreign id as a Prisma `P2025`/500). Unit specs must therefore assert on `mockTx.address.updateMany` (or `mockPrisma.*.updateMany`), and the `mockTx` model stub must include **every** method the transaction calls — including `findMany` when the method builds its refreshed response list inside the same `$transaction` (e.g. set-default returns the in-tx list). A stale spec asserting `update`, or a `mockTx` missing `findMany`, fails even though the implementation is correct.
+
+---
+
+## Stripe Webhook E2E: rawBody App + JSON Content-Type [order-module, payment-module]
+
+The webhook e2e creates the test app with `module.createNestApplication({ rawBody: true })` (mirroring `main.ts`) so the controller's `req.rawBody` is populated. Send the event as a raw `Buffer` **and set `Content-Type: application/json`** — without the header Supertest defaults to `application/octet-stream`, Nest's raw-body parser skips it, `req.rawBody` is `undefined`, and the controller's guard returns 400 (a false failure, not an app bug):
+
+```ts
+await request(app.getHttpServer())
+  .post('/payment/webhook')
+  .set('stripe-signature', 'valid-sig')
+  .set('Content-Type', 'application/json')      // required so req.rawBody fills
+  .send(Buffer.from(JSON.stringify(fakeEvent)));
+```
+
+`StripeService` is mocked (`constructWebhookEvent` returns the fake event; `refundPaymentIntent` a stub). `ConfigService` (`useValue`) must supply `STRIPE_SECRET_KEY` + `STRIPE_WEBHOOK_SECRET` so `StripeService` (or its real instance) can construct. Webhook metadata `user_id`/`address_id` must be **valid UUIDs** in fixtures — the handler `isUUID`-validates them and silently returns on a non-UUID, so `user-001`-style ids make placement assertions see zero calls.
+
+## Serializable `$transaction` Mock — Callback vs Array Form [cart-module, order-module]
+
+Two shapes are mocked differently:
+- **Callback form** (placement/cancel/refund): `mockPrisma.$transaction.mockImplementation((cb) => cb(mockTx))` so the body runs against `mockTx`. The `mockTx` stub must include every model method the body calls (e.g. `order.create`, `productVariant.update`, `couponUsage.deleteMany`, `coupon.update`, `cart.findUnique`/`deleteMany`).
+- **Array form** (paginated reads, e.g. `listOrders` count+findMany): `mockPrisma.$transaction.mockResolvedValue([count, rows])`.
+
+The narrowed placement `catch` (refund only on `BadRequestException`) means a "stock vanished → refund" test must `mockRejectedValue(new BadRequestException(...))`, not a generic `Error`.
+
+## Playwright Route Globs Must Match Query Strings [order-module]
+
+A `page.route()` **string** glob is an exact match unless it has a wildcard, so `${API_URL}/order` does **not** intercept `GET /order?page=1`. Use `${API_URL}/order*` — `*` matches the `?page=1` query but not `/order/:id` (it won't cross `/`), so the list, detail, and cancel routes stay distinct. Run Playwright from the `frontend/` dir (its `playwright.config.ts` testDir is `./e2e`); running from the repo root pulls in the backend jest specs and fails collection with a misleading "async test.describe" error.
+
+## Playwright getByText Is Case-Insensitive Substring [order-module]
+
+`page.getByText("Jane")` also matches `jane@example.com` (case-insensitive + substring) → a strict-mode "resolved to 2 elements" failure. Use `getByText("Jane", { exact: true })` when a value is a substring of another on the page.

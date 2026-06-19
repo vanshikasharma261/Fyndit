@@ -165,17 +165,41 @@ Applying a new coupon automatically replaces the previous coupon.
 
 # Coupon Rules
 
-Coupons must satisfy:
+Coupons must satisfy (all validated server-side in `CouponService.evaluate`):
 
 - Active
 - Not expired
-- Usage limit not exceeded
-- Order minimum requirement met
+- Global usage limit not exceeded (`used_count < usage_limit`)
+- **Not already used by this user** — one use per user, enforced by the
+  `CouponUsage` compound key `[coupon_id, user_id]`
+- Order minimum requirement met (compared against the **pre-coupon** subtotal)
 
 Supported coupon types:
 
-- Percentage Discount
-- Fixed Amount Discount
+- Percentage Discount (of the subtotal)
+- Fixed Amount Discount (clamped to the subtotal so the total never goes negative)
+
+## Coupon Lifecycle (checkout → order)
+
+- The cart holds the **code** in `cart.applied_coupon`; the cart summary never
+  shows a discount. The discount is computed only on the **checkout** summary
+  and persisted on the **order**.
+- **Re-verified on every `GET /checkout`**: an applied coupon that has become
+  invalid (expired / used / limit reached / min no longer met) is **cleared from
+  the cart** and dropped from the summary.
+- On placement (COD or Stripe webhook), the coupon is recorded: a `CouponUsage`
+  row is created and `used_count` is incremented, inside the placement
+  transaction. The chosen coupon is stored on `Order.coupon_id`.
+- On cancellation/refund the coupon is **released**: the `CouponUsage` row is
+  deleted and `used_count` decremented (only when a row existed — idempotent),
+  so the user can reuse it. This is why the `Order.coupon_id` column exists.
+
+## Shipping Fee
+
+- Flat **₹100** when the **pre-coupon subtotal is below ₹500**; **free** at or
+  above ₹500. (`SHIPPING_FEE` / `FREE_SHIPPING_THRESHOLD` in `values.constant.ts`;
+  computed in `CheckoutService.resolveShipping`.) The free-shipping threshold is
+  the items subtotal **before** any coupon discount.
 
 ---
 
@@ -229,6 +253,16 @@ Statuses not eligible:
 - DELIVERED
 - CANCELLED
 
+Cancellation mechanics (`OrderService.cancelOrder`):
+
+- **COD / unpaid** orders cancel **synchronously**: status → `CANCELLED`, stock
+  restored, coupon released — all in one Serializable transaction.
+- **Stripe-paid** orders cancel **webhook-driven**: a Stripe refund is requested
+  and the endpoint returns "refund initiated"; the `charge.refunded` webhook then
+  finalizes (status `CANCELLED`, payment `REFUNDED`, restock, coupon release).
+  All cancel/refund paths are idempotent (an already-`CANCELLED` order is a
+  no-op, so duplicate webhook deliveries can't double-restock).
+
 ---
 
 # Payment Rules
@@ -250,6 +284,22 @@ Payment Status:
 PAID
 
 Failed payments must not create orders.
+
+Mechanics (card flow):
+
+- `POST /checkout/payment-intent` creates a Stripe PaymentIntent for the
+  authoritative total and carries the checkout context in its **metadata**
+  (`user_id`, `address_id`, `coupon_code`). **No order is created here.**
+- The order is placed by the **`payment_intent.succeeded` webhook**
+  (`OrderService.placeStripeOrder`), which re-reads the cart, re-validates stock
+  + coupon inside a Serializable transaction, then creates the order/items/
+  payment (`PAID`, `stripe_payment_id` set).
+- **Idempotent:** a duplicate delivery is a no-op (guarded by an existing
+  `stripe_payment_id`). If the order is genuinely unfulfillable at webhook time
+  (out of stock / empty cart / bad address → a `BadRequestException`), the
+  captured payment is **auto-refunded** and no order is created. Transient
+  failures (duplicate-key, serialization) re-throw so Stripe retries.
+- Stripe amounts are in paise (`amount = round(rupees × 100)`, currency `inr`).
 
 ---
 

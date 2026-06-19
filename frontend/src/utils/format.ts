@@ -10,6 +10,16 @@ const rupeeFormatter = new Intl.NumberFormat(CURRENCY_LOCALE, {
   maximumFractionDigits: 0,
 });
 
+/**
+ * Exact-amount formatter (2 decimals) for checkout/order money, where every
+ * paisa matters — e.g. `₹1,178.56`. Distinct from `formatPrice`, which rounds
+ * for catalog display.
+ */
+const rupeeExactFormatter = new Intl.NumberFormat(CURRENCY_LOCALE, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
 function toNumber(value: string | number): number {
   const n = typeof value === "string" ? Number(value) : value;
   return Number.isFinite(n) ? n : 0;
@@ -27,6 +37,33 @@ export function titleCase(value: string): string {
 /** `"2999.00"` → `"₹2,999"`. */
 export function formatPrice(value: string | number): string {
   return `₹${rupeeFormatter.format(Math.round(toNumber(value)))}`;
+}
+
+/** `"1178.56"` → `"₹1,178.56"` — exact 2-decimal amount (checkout/orders). */
+export function formatMoney(value: string | number): string {
+  return `₹${rupeeExactFormatter.format(toNumber(value))}`;
+}
+
+const orderDateFormatter = new Intl.DateTimeFormat("en-GB", {
+  day: "2-digit",
+  month: "short",
+  year: "numeric",
+});
+
+/** ISO timestamp → `"01 Jun 2026"` (matches the order screenshots). */
+export function formatOrderDate(iso: string): string {
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? "" : orderDateFormatter.format(date);
+}
+
+/**
+ * A short, display-friendly order code derived from the order's uuid — the
+ * first 8 hex chars, upper-cased and `#`-prefixed (e.g. `"#A2224894"`). Mirrors
+ * the backend `OrderService.orderNumber`; the API also returns `order_number`,
+ * so prefer that when present and use this only as a fallback.
+ */
+export function formatOrderNumber(orderId: string): string {
+  return `#${orderId.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
 
 /**

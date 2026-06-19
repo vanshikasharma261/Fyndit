@@ -7,7 +7,9 @@ import ProductsPage from "../pages/Products/ProductsPage";
 import ProductDetailPage from "../pages/ProductDetail/ProductDetailPage";
 import ProfilePage from "../pages/Profile/ProfilePage";
 import CartPage from "../pages/Cart/CartPage";
-import PlaceholderPage from "../pages/Placeholder/PlaceholderPage";
+import CheckoutPage from "../pages/Checkout/CheckoutPage";
+import OrdersPage from "../pages/Orders/OrdersPage";
+import OrderDetailPage from "../pages/Orders/OrderDetailPage";
 import RequireAuth from "./RequireAuth";
 
 /**
@@ -44,8 +46,12 @@ export const router = createBrowserRouter([
           // Profile/Orders/Cart land as full features later; routed now so the
           // navbar profile menu has real targets.
           { path: "profile", element: <ProfilePage /> },
-          { path: "orders", element: <PlaceholderPage title="Orders" /> },
           { path: "cart", element: <CartPage /> },
+          { path: "checkout", element: <CheckoutPage /> },
+          // `orders/:orderId` before `orders` is harmless (distinct depth), but
+          // keep detail declared alongside the list for clarity.
+          { path: "orders", element: <OrdersPage /> },
+          { path: "orders/:orderId", element: <OrderDetailPage /> },
         ],
       },
     ],

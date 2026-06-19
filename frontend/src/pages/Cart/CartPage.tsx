@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowDown, Lock, Minus, Plus, Tag, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
@@ -96,6 +97,7 @@ function EmptyCart() {
 
 function CartPage() {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { items, summary, loading, error, mutatingId } = useAppSelector(
     (state) => state.cart,
   );
@@ -311,11 +313,10 @@ function CartPage() {
                 {formatPrice(summary.final_amount)}
               </span>
             </div>
-            {/* Checkout ships in the next feature — dummy action for now. */}
             <button
               type="button"
               className={styles.checkoutButton}
-              onClick={() => undefined}
+              onClick={() => navigate("/checkout")}
             >
               {CartMessages.checkout}
             </button>

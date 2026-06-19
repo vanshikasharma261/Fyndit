@@ -252,3 +252,46 @@ E2E specs in test/ must not import ConfigModule or the real AppModule. Instead: 
 - **Active-scope helper:** every read/write filters on `{ user_id, is_removed: false }` (an `activeScope(userId)` helper). Removed rows are invisible everywhere and excluded from counts.
 - **The "exactly one default" invariant** is held inside Serializable `$transaction`s: add (count-check + create + first-is-default), set-default (unset all active defaults → set target), remove (soft-delete → promote the most-recently-created remaining active address when the removed row was the default). When a transactional method returns the refreshed list, it builds that list on the `tx` client inside the same transaction.
 - **Response select excludes ownership/internal columns.** Define a single `select` constant (e.g. `ADDRESS_SELECT`) listing only contract columns; never select `user_id`, `is_removed`, `removed_at`, or internal timestamps, so they cannot leak even after a refactor. `is_default` is set only by the service (auto-default / auto-promote / set-default), never from a create/update DTO.
+
+---
+
+## Checkout / Order / Payment Module Graph [checkout-module, order-module, payment-module]
+
+Acyclic by design: **`payment` (leaf) → `checkout` → `order`**.
+
+- **`payment`** exports `StripeService` only — the sole `stripe` SDK wrapper
+  (createPaymentIntent / refundPaymentIntent / constructWebhookEvent). Depends on
+  `ConfigService` alone (Stripe keys via `getOrThrow`), so it stays a leaf.
+- **`checkout`** imports `payment`; provides `CheckoutService` + `CouponService`
+  and **exports both**. `CheckoutService.buildOrderContext(client, userId)` is the
+  single **authoritative** money/stock/coupon breakdown — computed inside the
+  placement transaction so the checkout display and the placed order can never
+  diverge. Money is serialized as `"0.00"` strings (`Prisma.Decimal.toFixed(2)`).
+- **`order`** imports `payment` + `checkout`; hosts the authenticated `/order`
+  controller **and** the unauthenticated `/payment/webhook` controller (the
+  webhook drives placement/cancellation). `OrderItem` snapshots `product_name` +
+  `purchase_price` (= `max(0, price − variant.discount)`); brand/image/attributes
+  are read live from the variant.
+
+## Stripe Webhook Rules [order-module, payment-module]
+
+- `main.ts` creates the app with `NestFactory.create(..., { rawBody: true })` so
+  the webhook can verify the Stripe signature against the **raw** body
+  (`req.rawBody`). The webhook controller is **unauthenticated** — it is gated by
+  the signature, not the JWT.
+- Verify with `StripeService.constructWebhookEvent(rawBody, signature)`, which
+  throws a `BadRequestException` (400, never 500) on a bad/missing signature.
+  Always respond `200 { received: true }` for handled and unknown event types.
+- Handle `payment_intent.succeeded` (→ place order from metadata) and
+  `charge.refunded` (→ finalize refund/cancel). Both handlers must be
+  **idempotent** (guard on an existing `stripe_payment_id` / an already-`CANCELLED`
+  order).
+- **Validate metadata** (`user_id`, `address_id`) with `isUUID` before any DB
+  use, even though it is signed by Stripe.
+- The placement `catch` must **refund only on `BadRequestException`** (genuinely
+  unfulfillable order); re-throw everything else (duplicate-key `P2002`,
+  serialization `P2034`, transient errors) so Stripe retries instead of refunding
+  a successfully-placed order.
+- Numeric tunables live in `values.constant.ts`: `SHIPPING_FEE`,
+  `FREE_SHIPPING_THRESHOLD`, `ORDER_PAGE_SIZE`, `STRIPE_CURRENCY`,
+  `PAISE_PER_RUPEE`.

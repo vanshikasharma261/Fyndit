@@ -97,7 +97,101 @@ export const NetworkErrorMessages = {
   message: "Unable to reach the server. Please check your connection.",
 } as const;
 
+export const CheckoutMessages = {
+  /** Page heading. */
+  heading: "Checkout",
+  /** Section headings (match the checkout screenshots). */
+  informationBar: "INFORMATION",
+  personalHeading: "PERSONAL INFORMATION",
+  shippingHeading: "SHIPPING INFORMATION",
+  paymentHeading: "PAYMENT",
+  bagHeading: "SHOPPING BAG",
+  /** Personal field labels. */
+  firstName: "FIRST NAME:",
+  lastName: "LAST NAME:",
+  phone: "PHONE:",
+  email: "EMAIL:",
+  /** Shipping. */
+  addAddress: "Add Address",
+  addressBadge: "ADDRESS",
+  noAddress: "Add a shipping address to continue.",
+  /** Payment options. */
+  cod: "Cash on Delivery",
+  card: "Credit / Debit Card",
+  /** Promo code. */
+  promoPlaceholder: "Promo Code",
+  apply: "Apply",
+  remove: "Remove",
+  /** Summary rows. */
+  shippingFee: "Shipping Fee",
+  discount: "Discount",
+  total: "Total",
+  free: "Free",
+  /** Out-of-stock overlay on a bag line. */
+  outOfStock: "Out of Stock",
+  /** Action buttons. */
+  placeOrderCod: "Pay & Place Order",
+  proceedToPayment: "Proceed to Payment",
+  confirmPay: "Confirm & Pay",
+  /** Toasts. */
+  addressAdded: "Address added",
+  couponApplied: "Coupon applied",
+  couponRemoved: "Coupon removed",
+  orderPlaced: "Order placed successfully",
+  paymentProcessing: "Payment successful — your order is being placed.",
+  /** Status copy. */
+  loading: "Loading…",
+  emptyTitle: "Nothing to check out",
+  emptyBody: "Your cart has no items available for checkout.",
+  emptyCta: "Back to cart",
+  /** Fallback when a request fails without a server message. */
+  genericError: "Something went wrong. Please try again.",
+} as const;
+
+export const OrderMessages = {
+  /** Page headings (match the order screenshots). */
+  historyHeading: "Order History",
+  detailHeading: "Your Order Details",
+  /** History table column headers. */
+  colProduct: "PRODUCT",
+  colOrderId: "ORDER ID",
+  colDate: "DATE",
+  colTotal: "TOTAL",
+  colStatus: "STATUS",
+  colAttributes: "ATTRIBUTES",
+  colAction: "ACTION",
+  /** Row actions. */
+  view: "View",
+  cancel: "Cancel",
+  /** Detail labels. */
+  orderDate: "ORDER DATE",
+  orderId: "ORDER ID",
+  paymentMethod: "PAYMENT METHOD",
+  status: "STATUS",
+  qty: "Qty:",
+  subtotal: "Subtotal",
+  discount: "Discount",
+  shipping: "Shipping",
+  total: "Total",
+  shippingTo: "Shipping To",
+  cod: "Cash on Delivery",
+  card: "Credit / Debit Card",
+  moreItems: (count: number) => `+${count} more item${count > 1 ? "s" : ""}`,
+  /** Empty state. */
+  empty: "You have not placed any orders yet.",
+  emptyCta: "Start shopping",
+  /** Toasts. */
+  cancelSuccess: "Order cancelled",
+  /** Status copy. */
+  loading: "Loading…",
+  notFound: "Order not found.",
+  /** Fallback when a request fails without a server message. */
+  genericError: "Something went wrong. Please try again.",
+} as const;
+
 export const ConfigMessages = {
   missingApiUrl:
     "VITE_API_URL is not defined. Set it in frontend/.env (e.g. http://localhost:3000).",
+  missingStripeKey:
+    "VITE_STRIPE_PUBLISHABLE_KEY is not defined. Set it in frontend/.env.",
 } as const;

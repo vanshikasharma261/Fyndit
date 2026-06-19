@@ -41,3 +41,20 @@ export const MAX_ACTIVE_ADDRESSES = 5;
 export const CATEGORY_ALIASES: Record<string, string[]> = {
   clothing: ['mens-clothing', 'womens-clothing'],
 };
+
+/**
+ * Flat shipping fee (in rupees) charged when the pre-coupon order subtotal is
+ * below {@link FREE_SHIPPING_THRESHOLD}; orders at/above the threshold ship
+ * free. Constant for now — there is no per-region shipping calculation.
+ */
+export const SHIPPING_FEE = 100;
+
+/** Order subtotal (before coupon) at/above which shipping is free. */
+export const FREE_SHIPPING_THRESHOLD = 500;
+
+/** Page size for the paginated order history (`GET /order`). */
+export const ORDER_PAGE_SIZE = 10;
+
+/** Stripe charges in the smallest currency unit (paise for INR): ₹1 = 100. */
+export const STRIPE_CURRENCY = 'inr';
+export const PAISE_PER_RUPEE = 100;

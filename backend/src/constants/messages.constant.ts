@@ -51,6 +51,41 @@ export const AddressMessages = {
   notFound: 'Address not found',
 } as const;
 
+export const CouponMessages = {
+  // All surfaced as a 400 when applying / re-verifying a coupon.
+  invalid: 'This coupon code is not valid',
+  expired: 'This coupon has expired',
+  inactive: 'This coupon is no longer active',
+  usageLimitReached: 'This coupon has reached its usage limit',
+  alreadyUsed: 'You have already used this coupon',
+  minOrderNotMet: 'Your order does not meet this coupon’s minimum amount',
+  applied: 'Coupon applied successfully',
+  removed: 'Coupon removed',
+} as const;
+
+export const CheckoutMessages = {
+  // Nothing purchasable in the cart (all empty / out of stock) — blocks checkout.
+  emptyCart: 'Your cart has no items available for checkout',
+  // A line went out of stock between adding and placing the order (400).
+  insufficientStock:
+    'Some items are no longer available in the requested quantity',
+} as const;
+
+export const OrderMessages = {
+  placeSuccess: 'Order placed successfully',
+  cancelSuccess: 'Order cancelled successfully',
+  // A Stripe-paid order: refund requested, finalised by the webhook.
+  refundInitiated: 'Refund initiated. It will reflect once processed.',
+  // Ownership / lookup failure (404).
+  notFound: 'Order not found',
+  // The order is past the cancellable window (400).
+  notCancellable: 'This order can no longer be cancelled',
+  // Card flow must go through the payment-intent endpoint, not POST /order.
+  invalidPaymentMethod: 'Card orders must be paid before they are placed',
+  // Webhook signature could not be verified (400).
+  webhookSignatureInvalid: 'Invalid webhook signature',
+} as const;
+
 export const ProductMessages = {
   productNotFound: 'Product not found',
   invalidAttributesFilter:
