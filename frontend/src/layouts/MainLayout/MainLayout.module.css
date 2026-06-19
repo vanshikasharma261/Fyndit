@@ -1,7 +1,9 @@
 .shell {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  /* Fill the viewport so short pages still push the footer to the bottom;
+     taller pages grow past it and the window scrolls normally. */
+  min-height: 100dvh;
   background-color: var(--color-surface);
 }
 
@@ -322,6 +324,9 @@
 /* ----- Content ----- */
 .content {
   flex: 1 1 auto;
+  /* Each page fills at least a full viewport so the footer is pushed below the
+     fold (revealed on scroll); pages taller than the viewport simply extend. */
+  min-height: 100dvh;
 }
 
 /* ----- Footer ----- */

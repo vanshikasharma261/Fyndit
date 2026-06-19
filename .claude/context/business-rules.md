@@ -116,17 +116,31 @@ Each user owns exactly one cart.
 
 ## Quantity Rules
 
-Minimum Quantity:
+Minimum quantity per line: 1.
 
-1
+Maximum quantity per line: `min(MAX_CART_ITEM_QUANTITY, current available stock)`,
+where `MAX_CART_ITEM_QUANTITY = 20` is a fixed per-line cap and current stock is
+the real ceiling. Enforced server-side on both `PATCH` (update) and the
+`POST` add/increment path (so the cap can't be exceeded by repeated adds).
 
-Maximum Quantity:
+## Cart Size Limit
 
-Current Available Stock
+A cart holds at most **25 distinct line items** (`MAX_CART_ITEMS`). Adding a
+**new** variant to a full cart is rejected (`cartFull` — "checkout or remove an
+item"); increasing the quantity of an item already in the cart is unaffected by
+this cap. The cart is returned whole (no pagination) — the cap bounds its size.
+
+## Add / Stock Behavior
+
+Out-of-stock (`stock === 0`) or inactive products cannot be added (400). The
+frontend leaves the product-detail "Add to Cart" / "Buy" buttons **clickable**
+(not disabled by stock) and surfaces any rejection — out of stock, cart full,
+over stock — as a toast.
 
 ## Coupon Rules
 
-Only one coupon can be applied at a time.
+Only one coupon can be applied at a time, and **at checkout, not in the cart** —
+the cart summary never includes a coupon discount.
 
 Applying a new coupon automatically replaces the previous coupon.
 

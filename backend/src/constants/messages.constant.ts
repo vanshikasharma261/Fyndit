@@ -25,6 +25,21 @@ export const UserMessages = {
   emailAlreadyExists: 'An account with this email already exists',
 } as const;
 
+export const CartMessages = {
+  updateSuccess: 'Cart updated successfully',
+  removeSuccess: 'Item removed from cart',
+  // Stock / availability failures (400).
+  outOfStock: 'This item is out of stock',
+  exceedsStock: 'Requested quantity exceeds the available stock',
+  maxQuantityReached: 'You can add at most 20 of this item to your cart',
+  productUnavailable: 'This product is no longer available',
+  // The cart already holds the maximum number of distinct items (400).
+  cartFull:
+    'Your cart is full. Please checkout or remove an item before adding more.',
+  // Ownership / lookup failure (404).
+  cartItemNotFound: 'Cart item not found',
+} as const;
+
 export const ProductMessages = {
   productNotFound: 'Product not found',
   invalidAttributesFilter:

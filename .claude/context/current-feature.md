@@ -1,58 +1,60 @@
 ## Current Feature
 
-**User Module — Profile Management** (spec: `006-user-module.md`)
+**Cart Feature — Backend Cart Module + Frontend Cart Page** (spec: `007-cart-feature.md`)
 
-Branch: `feature/user-module` (to be cut from `main`).
+Branch: `feature/cart-module` (cut from `main`).
 
-Introduces the backend `/user` domain module (read / update / soft-delete the **authenticated** user, identified via `@CurrentUser()` — never a client-supplied id) and the frontend **Profile page** with inline, per-field editing of the "Manage Your Profile" panel. A dummy "Addresses" panel ships on the right as a placeholder; real address management is the next feature.
+Implements the full cart experience: a backend `cart` module owning view / add / update-quantity / remove, and a frontend Cart page (populated `cart_ui.png` / empty `empty_cart_ui.png`) plus the wired product-detail "Add to Cart" button and a live navbar cart badge. Cart summary = total items / total price / total product discount / final amount; **coupons are excluded** (applied at checkout). Quantities are stock-bounded (min 1, max current stock); out-of-stock/inactive products can't be added.
 
 ## Status
 
-Done — backend `/user` module + frontend Profile page implemented; lint/build/test clean on both apps; reviewed (security/prisma/quality/ui) with in-scope fixes applied. See History entry 7.
+Done — backend `cart` module + frontend Cart page/feature implemented; schema migration applied; lint/build clean on both apps; backend Jest+Supertest and frontend Vitest/RTL+Playwright green; reviewed (quality/prisma/security/ui) with approved fixes applied; context refined. See History entry 9.
 
 ## Goal
 
-Let a signed-in user view and manage their own profile. Backend: a feature-isolated `user` module mirroring `auth` conventions (thin controller, logic in `UserService`, `PrismaService` only, no `any`, response contract in `user/types/`, copy in a new `UserMessages` group). Every operation runs the existing `AuthService.isUserActive(user.id)` precheck before touching the DB. Frontend: a `ProfilePage` + `features/user/` slice/service/types mirroring the auth feedback model, with per-row inline edit (pencil → input + green tick → confirm) and field-level validation rendered under each row. Screenshots are the source of truth (`profile_ui.png`, `profile_edit_ui.png`, `profile_edit_error_ui.png`). See `specs/006-user-module.md` for the full Definition of Done.
+Deliver end-to-end cart functionality for the authenticated user. Backend: a feature-isolated `cart` module mirroring `product`/`user` conventions (thin controller, logic in `CartService`, `PrismaService` only, no `any`, response contracts in `cart/types/`, copy in a new `CartMessages` group, `JwtAuthGuard` + `assertActiveUser` precheck on every op; identity from `@CurrentUser()` only; ownership-checked). Frontend: a `CartPage` + `features/cart/` slice/service/types mirroring the established architecture, the wired product-detail "Add to Cart" button, and the navbar cart badge reflecting the live item count. Screenshots are the source of truth (`cart_ui.png`, `empty_cart_ui.png`). See `specs/007-cart-feature.md` for the full Definition of Done.
 
 ## Scope / Plan
 
-### Backend — `user` module (`backend/src/user/`)
+### Confirmed decisions
 
-No schema migration needed — `is_deleted`/`deleted_at` and all editable columns already exist on `User`. Structure:
+1. **Add when already in cart → increment quantity by 1** (capped at stock); new variant → create at qty 1; add takes only `product_variant_id`.
+2. **Full frontend**: Cart page + wire product-detail "Add to Cart" + live navbar badge (was hardcoded `0`).
+3. **Coupon excluded** from the cart summary (coupons belong to checkout).
+4. **Strict stock enforcement (400)**: update qty > stock → 400; qty < 1 → 400; add/increment beyond stock → 400; add out-of-stock/inactive → 400.
+5. **No pagination; max 25 distinct items (`MAX_CART_ITEMS = 25`)**: `GET /cart` returns the whole cart (summary + all items). Adding a **new** variant when the cart already has 25 lines → 400 `cartFull` ("checkout or remove an item"); incrementing an existing line is unaffected. Overrides the dev-rules "paginate cart items" rule for this feature (reconcile in Phase 6). "25 items" = 25 distinct lines, not units.
+6. **Schema change approved**: add `@@unique([cart_id, product_variant_id])` to `CartItem` (migration `cart_item_unique_variant`) so "add" uses an atomic `upsert`.
+
+### Backend — `cart` module (`backend/src/cart/`)
 
 ```
-backend/src/user/
-├── user.module.ts          // imports AuthModule (for isUserActive) + PrismaModule
-├── user.controller.ts      // @UseGuards(JwtAuthGuard); @CurrentUser() only
-├── user.service.ts
-├── dto/update-user.dto.ts
-└── types/user.types.ts      // UserProfile response contract (incl. phone)
+backend/src/cart/
+├── cart.module.ts            // imports AuthModule; PrismaModule is global
+├── cart.controller.ts        // @UseGuards(JwtAuthGuard); @CurrentUser() only
+├── cart.service.ts
+├── dto/{add-cart-item,update-cart-item}.dto.ts
+└── types/cart.types.ts
 ```
 
-Register `UserModule` in `AppModule`. All three handlers are guarded and identify the user via `@CurrentUser().id`; **no id is ever read from body/params**.
+Register `CartModule` in `AppModule`. Every op runs `assertActiveUser` (401) before any DB access; user id from the JWT only; ownership violations → 404; money serialized as `"0.00"` strings via `Decimal.toFixed(2)`; `final_price = max(0, price − discount)`; preview image = primary else lowest `sort_order`; `total_items` = Σ quantities (drives the badge). Endpoints: `GET /cart` (summary over all items + every item, no pagination), `POST /cart` (add/increment via `upsert`; blocks a 26th distinct line with `cartFull`), `PATCH /cart/:cartItemId` (update qty, `1..stock`), `DELETE /cart/:cartItemId` (message). `:cartItemId` validated with `ParseUUIDPipe`. `MAX_CART_ITEMS = 25` in `values.constant.ts`; new `CartMessages` group in `messages.constant.ts`. Contracts: `CartItem`, `CartSummary`, `CartResponse`, `AddToCartResponse`, `UpdateCartResponse` (see spec).
 
-- **`GET /user`** — `isUserActive` precheck → load by `user_id` with explicit `select` (no `password_hash`/internal flags) → return `UserProfile` (`id`, `email`, `first_name`, `last_name`, `user_name`, **`phone`**). `phone` is added vs the `/auth/me` `UserProfile`; leave `/auth/me` unchanged.
-- **`PATCH /user`** — `isUserActive` precheck → validate `UpdateUserDto` (all fields optional/partial; reuse signup validators + `ValidationMessages`) → update only whitelisted fields → re-select + return `UserProfile`. On email change, preserve uniqueness: catch Prisma `P2002` → field error `{ errors: { email } }`.
-- **`DELETE /user`** (soft delete) — `isUserActive` precheck → set `is_deleted=true`, `deleted_at=now()`, `is_active=false` → clear the auth cookie (reuse `AuthService` cookie-clear options) → `{ message: UserMessages.deleteSuccess }`. Never hard-delete.
-
-Editable fields (map 1:1 to columns): `first_name`, `last_name`, `user_name`, `email`, `phone`. Global pipe `whitelist` + `forbidNonWhitelisted` strips/rejects `password`/ids/extra keys (no escalation). All copy from a new `UserMessages` group in `messages.constant.ts`.
-
-### Frontend — Profile page
-
-Replace the `/profile` placeholder route in `router.tsx` (`<PlaceholderPage title="My Profile" />`) with the real `ProfilePage`, still inside `MainLayout` behind `RequireAuth`. Structure:
+### Frontend — Cart page + Add-to-Cart + badge
 
 ```
 frontend/src/
-├── pages/Profile/{ProfilePage.tsx, Profile.module.css}
-├── features/user/{userSlice.ts, userService.ts, types.ts}   // UserState
-└── types/user.types.ts   // UserProfile (incl. phone), UpdateUserRequest; reuse existing error envelopes
+├── pages/Cart/{CartPage.tsx, Cart.module.css}   // replaces /cart placeholder
+├── features/cart/{cartSlice.ts, cartService.ts, types.ts}   // CartState
+├── types/cart.types.ts                          // API contracts
+├── routes/router.tsx · store/store.ts           // route + register `cart` reducer
+├── layouts/MainLayout/MainLayout.tsx            // badge = summary.total_items; fetchCart when authed
+└── pages/ProductDetail/ProductDetailPage.tsx    // wire "Add to Cart"
 ```
 
-- **Layout (`profile_ui.png`):** two columns — left "Manage Your Profile" card with one row per editable field (uppercase label + value + pencil icon); right "Addresses" dummy panel (heading + placeholder only, no API).
-- **Inline edit (`profile_edit_ui.png`):** per-row, click pencil → focused `<input>` + green tick + accent border; click tick → `PATCH /user` with just that field; success → exit edit mode, show new value + success message. One field at a time per row.
-- **Validation (`profile_edit_error_ui.png`):** mirror the auth model in `userSlice`/`UserState` — 400 → `state.errors` (flat `{field: message}` map), other failures → `state.message`. Field errors render **under the offending row** (reserve vertical space, keep accent border). Toast/message shows **"Validation Failed"** for validation errors (not "Something went wrong"), server `message` otherwise.
-- `UserState`: `{ profile, loading, success, message, errors }`; thunks `fetchUser` / `updateUser` / `deleteUser`; reuse the auth slice's `startRequest`/`failRequest` helper pattern; all `fetch` in `userService.ts` with `credentials: "include"`; register the `user` reducer in the store.
-- CSS Modules + theme variables only (no hardcoded colours).
+- `cartService.ts` — all `fetch` (`credentials: "include"`, `ApiResult<T>`): `getCart`, `addToCart`, `updateItem`, `removeItem`.
+- `cartSlice.ts` — thunks `fetchCart` / `addToCart` / `updateCartItem` / `removeCartItem`; branch on `ok`; synthetic `NETWORK_ERROR` from shared `NetworkErrorMessages`; `add`/`update` patch `summary` so the badge stays live; `remove` re-fetches the cart. `CartState`: `{ items, summary, loading, error, mutatingId, message }`.
+- **Populated (`cart_ui.png`)** — left "Shopping Cart" item cards (image, name, brand, attribute pills, discount % + struck price + final price, "In Stock", quantity stepper bounded `1..stock`, "Remove Item"); right "PRICE DETAILS" (Price / Discount / Total Amount + save note + CHECKOUT placeholder).
+- **Empty (`empty_cart_ui.png`)** — centered "Your Cart is empty" + illustration; no summary/CHECKOUT; badge 0.
+- Reuse `utils/format.ts`, `utils/image.ts`; CSS Modules + theme tokens only; responsive (columns stack on mobile).
 
 ---
 
@@ -227,3 +229,13 @@ Branch `improvement/discount-badge-ui` (cut from `feature/products-browsing`). S
    - **Frontend tests:** Vitest + RTL infra (`vitest.config.ts`, `src/test/setup.ts` with a `ResizeObserver` stub, `src/test/renderWithProviders.tsx`); 8 unit/component/slice/util tests; Playwright e2e (`auth`, `products-browsing`, `user-profile`) + `playwright.config.ts`. Playwright runs against a **live** backend, not mocks (start backend → `wait-on :3000` → run → kill). Conventions captured in `testing-patterns.md` (Redux test store, StrictMode `/auth/me` intercept flag, API-origin-anchored routes, strict-mode locator scoping).
    - **Self-improving context:** new `.claude/context/testing-patterns.md`; the two tester agents append discoveries to it / `business-rules.md` / `development-rules.md` rather than rewriting.
    - **Agent + doc corrections (this pass):** both tester agents now (a) read `testing-patterns.md` **and** `current-feature.md` + the named spec before writing tests, (b) follow a **report-and-wait** policy — write unit + e2e tests, run with coverage, surface failures with a proposed fix, and make **no application-code changes without explicit permission** (replacing the old "do not stop until all pass" wording), and (c) require a coverage summary. Frontend agent's slice-test path corrected to `src/features/[feature]/[feature]Slice.test.ts` (matches the placed files) and its typos fixed. Context files refined to state the auth-only requirement clearly and to describe the upcoming cart (`cart_ui.png`) and checkout (`checkout_cod_ui.png` / `checkout_stripe_ui.png`, coupon-before-payment + shipping fee, out-of-stock overlay) flows — design notes for the next feature, no code yet.
+
+9. **Cart Feature — Backend Cart Module + Frontend Cart Page** — *Done* (spec `007-cart-feature.md`). Branch `feature/cart-module` (cut from `main`). Full cart experience: a `cart` backend module (view / add / update-qty / remove) + the Cart page, wired product-detail "Add to Cart", and a live navbar badge.
+   - **Backend:** new `cart/` module (controller, `CartService`, `AddCartItemDto`/`UpdateCartItemDto`, `types/cart.types.ts`) registered in `AppModule`; imports `AuthModule`. `GET /cart` (summary over all lines + every item, **no pagination**), `POST /cart` (add — atomic `upsert` on the new compound unique, `@HttpCode(200)` since it may only increment), `PATCH /cart/:cartItemId` (qty), `DELETE /cart/:cartItemId`. Guarded by `JwtAuthGuard`; `assertActiveUser` precheck (401) on every op; identity from `@CurrentUser()` only; `:cartItemId` via `ParseUUIDPipe`. Money serialized as `"0.00"` strings (`Prisma.Decimal`, never float); `final_price = max(0, price − discount)`; `total_items` = Σ quantities. New `CartMessages`; `MAX_CART_ITEMS = 25`, `MAX_CART_ITEM_QUANTITY = 20` in `values.constant.ts`.
+   - **Confirmed decisions:** add increments by 1 (cap at `min(20, stock)`); **25 distinct-line cap** (a 26th *new* line → `cartFull`; incrementing existing unaffected); **coupon excluded** (checkout-only); strict stock enforcement (400); out-of-stock/inactive can't be added but the FE leaves Add-to-Cart/Buy **clickable** and toasts the rejection (per user decision — overrides the spec's earlier "disable" wording).
+   - **Schema:** added `@@unique([cart_id, product_variant_id])` to `CartItem` (migration `cart_item_unique_variant`); enables the atomic add `upsert`.
+   - **Review fixes applied (approved):** wrapped add's count/stock-check + upsert in a Serializable `$transaction` (cap can't be raced); switched update/remove to ownership-scoped `updateMany`/`deleteMany` (404 not P2025/500); `POST` → 200; `@Max(20)` on the update DTO + the same cap on the add/increment path (`maxQuantityReached`); FE: savings tag icon → green, removed the global `mutatingId` guard (per-line `disabled` only), centralized cart strings, `aria-label` on the qty value, richer empty-cart SVG.
+   - **Frontend:** `features/cart/` (slice/service/types — `CartState` has **no `message`**; feedback is **react-toastify** toasts, green success / red error, top-right), `pages/Cart/` (populated + empty states), `types/cart.types.ts`; `cart` reducer registered; `MainLayout` badge = `summary.total_items` (fetches cart when authed, resets on logout/sessionExpired/deleteUser); product-detail Add-to-Cart wired; CHECKOUT button is an enabled placeholder (next feature). `--color-success-subtle` token added. Each `MainLayout` page now fills the viewport (`min-height: 100dvh`) so the footer sits below the fold. `renderWithProviders` migrated off the removed RTK `PreloadedState` type to `combineReducers` + `Partial<RootState>` and includes the `cart` reducer.
+   - **Tests:** backend Jest unit (`cart.service.spec.ts`, 48) + Supertest e2e (`cart.e2e-spec.ts`); frontend Vitest/RTL (`cartSlice`, `CartPage`, `MainLayout` badge) + Playwright (`e2e/cart.spec.ts`). All green; both apps `npm run lint`/`build` clean. New testing pattern captured: Prisma `$transaction` mock for Serializable writes.
+   - **Verified:** booted live and exercised in the browser per the user (cart page layout, stepper, toasts, badge, empty state, full-height footer) with iterative UI fixes against `cart_ui.png` / `empty_cart_ui.png`.
+   - **Deferred (out of scope):** checkout/coupons/payments + the "Buy" action (next feature); pre-existing cross-cutting debt reaffirmed by reviewers — `ApiResult<T>` now duplicated across 4 services, `authSlice` inline `NETWORK_ERROR`, `ProductService` 403 vs cart/user 401 for inactive sessions.

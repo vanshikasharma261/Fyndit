@@ -12,6 +12,32 @@ export const ProductMessages = {
   clearFilters: "Clear filters",
 } as const;
 
+export const CartMessages = {
+  /** Heading on the populated cart page. */
+  heading: "Shopping Cart",
+  /** Summary panel heading. */
+  priceDetails: "PRICE DETAILS",
+  /** Empty-cart heading (matches `empty_cart_ui.png`). */
+  empty: "Your Cart is empty",
+  /** Shown while the cart is loading. */
+  loading: "Loading…",
+  /** Brief confirmation after a successful add-to-cart. */
+  addSuccess: "Added to cart",
+  /** Remove-item action label. */
+  removeItem: "Remove Item",
+  /** Checkout button label (checkout itself is a later feature). */
+  checkout: "CHECKOUT",
+  /** Stock status labels on a cart line. */
+  inStock: "In Stock",
+  outOfStock: "Out of Stock",
+  /** Per-line delivery note (capitalization matches cart_ui.png). */
+  deliveryNote: "Item Will be delivered within 5 days.",
+  /** Trust line under the price summary. */
+  trust: "Safe and Secure payments. Easy returns. 100% Authentic products.",
+  /** Fallback when a cart request fails without a server message. */
+  genericError: "Something went wrong. Please try again.",
+} as const;
+
 export const AuthGateMessages = {
   /** Shown while the initial `GET /auth/me` session check is in flight. */
   checkingSession: "Loading…",

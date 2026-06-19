@@ -1,27 +1,30 @@
 import React from "react";
 import { render } from "@testing-library/react";
 import type { RenderOptions } from "@testing-library/react";
-import { configureStore } from "@reduxjs/toolkit";
+import { combineReducers, configureStore } from "@reduxjs/toolkit";
 import { Provider } from "react-redux";
 import { MemoryRouter } from "react-router-dom";
-import type { PreloadedState } from "@reduxjs/toolkit";
 import authReducer from "../features/auth/authSlice";
 import productsReducer from "../features/products/productsSlice";
 import userReducer from "../features/user/userSlice";
+import cartReducer from "../features/cart/cartSlice";
 import type { RootState } from "../store/store";
 
 /**
- * Creates a fresh test store with optional preloaded state slices.
+ * Reducer map mirroring the real store (`src/store/store.ts`). Combined up front
+ * so `configureStore` accepts a partial `preloadedState` (RTK 2 dropped the old
+ * `PreloadedState<RootState>` type).
  */
+const rootReducer = combineReducers({
+  auth: authReducer,
+  products: productsReducer,
+  user: userReducer,
+  cart: cartReducer,
+});
+
+/** Creates a fresh test store with optional preloaded state slices. */
 export function createTestStore(preloadedState?: Partial<RootState>) {
-  return configureStore({
-    reducer: {
-      auth: authReducer,
-      products: productsReducer,
-      user: userReducer,
-    },
-    preloadedState: preloadedState as PreloadedState<RootState>,
-  });
+  return configureStore({ reducer: rootReducer, preloadedState });
 }
 
 interface RenderWithProvidersOptions extends Omit<RenderOptions, "wrapper"> {

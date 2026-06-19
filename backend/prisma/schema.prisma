@@ -127,6 +127,9 @@ model CartItem {
 
   product_variant ProductVariant @relation(fields: [product_variant_id], references: [product_variant_id])
 
+  // One line per variant per cart: lets "add to cart" use an atomic upsert and
+  // guards against duplicate lines for the same variant.
+  @@unique([cart_id, product_variant_id])
   @@index([cart_id])
   @@index([product_variant_id])
 }

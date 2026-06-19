@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import { logoutUser } from "../../features/auth/authSlice";
+import { fetchCart } from "../../features/cart/cartSlice";
 import {
   FOOTER_SHOP_LINKS,
   NAV_LINKS,
@@ -35,6 +36,17 @@ function MainLayout() {
   const { isAuthenticated, authChecked, user } = useAppSelector(
     (state) => state.auth,
   );
+  const cartCount = useAppSelector(
+    (state) => state.cart.summary?.total_items ?? 0,
+  );
+
+  // Populate the cart badge once the session is confirmed, and keep it in sync
+  // after add/update/remove (those mutations refresh `summary` in the slice).
+  useEffect(() => {
+    if (authChecked && isAuthenticated) {
+      void dispatch(fetchCart());
+    }
+  }, [authChecked, isAuthenticated, dispatch]);
 
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -255,7 +267,9 @@ function MainLayout() {
           ) : null}
           <Link to="/cart" className={styles.cartButton} aria-label="Cart">
             <ShoppingCart size={22} aria-hidden="true" />
-            <span className={styles.cartBadge}>0</span>
+            {cartCount > 0 && (
+              <span className={styles.cartBadge}>{cartCount}</span>
+            )}
           </Link>
         </div>
       </header>

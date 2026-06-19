@@ -2,6 +2,7 @@ import { configureStore } from "@reduxjs/toolkit";
 import authReducer from "../features/auth/authSlice";
 import productsReducer from "../features/products/productsSlice";
 import userReducer from "../features/user/userSlice";
+import cartReducer from "../features/cart/cartSlice";
 import { authExpiryMiddleware } from "./authExpiryMiddleware";
 
 /**
@@ -16,6 +17,7 @@ export const store = configureStore({
     auth: authReducer,
     products: productsReducer,
     user: userReducer,
+    cart: cartReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(authExpiryMiddleware),

@@ -13,6 +13,21 @@ export const DEFAULT_LIMIT = 12;
 export const SEARCH_MAX_LENGTH = 200;
 
 /**
+ * Maximum number of distinct line items a single cart may hold. Adding a NEW
+ * variant beyond this is refused (the user must checkout or remove an item);
+ * incrementing an item already in the cart is unaffected. This bounds the
+ * (unpaginated) cart query in place of pagination.
+ */
+export const MAX_CART_ITEMS = 25;
+
+/**
+ * Maximum quantity allowed for a single cart line. The variant's current stock
+ * is still the real ceiling (enforced in `CartService`); the effective cap is
+ * `min(MAX_CART_ITEM_QUANTITY, stock)`. Enforced at the DTO layer via `@Max`.
+ */
+export const MAX_CART_ITEM_QUANTITY = 20;
+
+/**
  * Curated navbar scopes that are not real category slugs but span specific
  * child categories. Keyed by the lower-cased path param.
  */
