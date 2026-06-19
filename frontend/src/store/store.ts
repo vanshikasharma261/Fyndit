@@ -4,6 +4,8 @@ import productsReducer from "../features/products/productsSlice";
 import userReducer from "../features/user/userSlice";
 import cartReducer from "../features/cart/cartSlice";
 import addressReducer from "../features/address/addressSlice";
+import checkoutReducer from "../features/checkout/checkoutSlice";
+import orderReducer from "../features/order/orderSlice";
 import { authExpiryMiddleware } from "./authExpiryMiddleware";
 
 /**
@@ -20,6 +22,8 @@ export const store = configureStore({
     user: userReducer,
     cart: cartReducer,
     address: addressReducer,
+    checkout: checkoutReducer,
+    order: orderReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().concat(authExpiryMiddleware),

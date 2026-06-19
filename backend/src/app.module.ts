@@ -8,6 +8,9 @@ import { ProductModule } from './product/product.module';
 import { UserModule } from './user/user.module';
 import { CartModule } from './cart/cart.module';
 import { AddressModule } from './address/address.module';
+import { PaymentModule } from './payment/payment.module';
+import { CheckoutModule } from './checkout/checkout.module';
+import { OrderModule } from './order/order.module';
 
 @Module({
   imports: [
@@ -18,6 +21,9 @@ import { AddressModule } from './address/address.module';
     UserModule,
     CartModule,
     AddressModule,
+    PaymentModule,
+    CheckoutModule,
+    OrderModule,
   ],
   controllers: [AppController],
   providers: [AppService],

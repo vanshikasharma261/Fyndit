@@ -59,10 +59,12 @@ Cart
 
 Order
 ├── Order Items
-└── Payment
+├── Payment
+└── Coupon (optional — coupon_id, set at placement)
 
 Coupon
-└── Coupon Usage
+├── Coupon Usage
+└── Orders
 
 Payment
 └── Order
@@ -98,9 +100,14 @@ Each variant stores:
 
 Order
 ├── Order Items
-├── Address Snapshot
+├── Address (address_id; read live so a removed address still shows on the order)
 ├── Payment
+├── Coupon (optional coupon_id — enables releasing the coupon on cancellation)
 └── User
+
+Order also stores the money breakdown: sub_total (post-variant-discount, pre-coupon),
+coupon_discount, shipping_fee, total_amount. The display "order number" (e.g.
+"#A2224894") is derived from order_id (first 8 hex chars) — there is no separate column.
 
 Order Item stores:
 
