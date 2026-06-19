@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
@@ -120,6 +121,8 @@ type OrderAddressRow = Prisma.AddressGetPayload<{
  */
 @Injectable()
 export class OrderService {
+  private readonly logger = new Logger(OrderService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
@@ -267,6 +270,9 @@ export class OrderService {
     paymentIntentId: string,
   ): Promise<void> {
     if (!isUUID(metadata.user_id) || !isUUID(metadata.address_id)) {
+      this.logger.warn(
+        `placeStripeOrder skipped ${paymentIntentId}: metadata is not a checkout intent (user_id/address_id not UUIDs)`,
+      );
       return; // not one of our checkout intents (missing/malformed metadata)
     }
 
@@ -275,6 +281,9 @@ export class OrderService {
       select: { payment_id: true },
     });
     if (existing) {
+      this.logger.log(
+        `placeStripeOrder skipped ${paymentIntentId}: order already placed (idempotent)`,
+      );
       return; // already placed — idempotent
     }
 
@@ -297,6 +306,9 @@ export class OrderService {
         },
         { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
       );
+      this.logger.log(
+        `placeStripeOrder placed order for ${paymentIntentId} (user ${metadata.user_id})`,
+      );
     } catch (error) {
       // Only refund when the order is genuinely unfulfillable (out of stock /
       // empty cart / address gone) — a BadRequestException from buildOrderContext
@@ -304,9 +316,15 @@ export class OrderService {
       // transient serialization failure (P2034) must NOT refund a placed order;
       // re-throw so Stripe retries the webhook.
       if (error instanceof BadRequestException) {
+        this.logger.warn(
+          `placeStripeOrder refunding ${paymentIntentId}: order unfulfillable — ${error.message}`,
+        );
         await this.stripe.refundPaymentIntent(paymentIntentId);
         return;
       }
+      this.logger.error(
+        `placeStripeOrder failed ${paymentIntentId} (will let Stripe retry): ${String(error)}`,
+      );
       throw error;
     }
   }

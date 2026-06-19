@@ -4,6 +4,7 @@ import {
   Headers,
   HttpCode,
   HttpStatus,
+  Logger,
   Post,
   Req,
 } from '@nestjs/common';
@@ -27,6 +28,8 @@ import { OrderMessages } from '../constants/messages.constant';
  */
 @Controller('payment')
 export class OrderWebhookController {
+  private readonly logger = new Logger(OrderWebhookController.name);
+
   constructor(
     private readonly stripe: StripeService,
     private readonly orderService: OrderService,
@@ -39,10 +42,14 @@ export class OrderWebhookController {
     @Headers('stripe-signature') signature: string,
   ): Promise<{ received: true }> {
     if (!req.rawBody || !signature) {
+      this.logger.warn(
+        `Rejected webhook: rawBody=${Boolean(req.rawBody)} signature=${Boolean(signature)}`,
+      );
       throw new BadRequestException(OrderMessages.webhookSignatureInvalid);
     }
 
     const event = this.stripe.constructWebhookEvent(req.rawBody, signature);
+    this.logger.log(`Webhook received: ${event.type} (${event.id})`);
 
     switch (event.type) {
       case 'payment_intent.succeeded': {
