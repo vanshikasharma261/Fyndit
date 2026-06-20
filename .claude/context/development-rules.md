@@ -185,6 +185,11 @@ No direct API calls inside components.
 
 Use Async Thunks only.
 
+Not every page needs a slice/service. A purely presentational page (e.g. the
+Home page) may hold its content in a local typed constant and render it
+directly — no Redux/service when there is no server state. Import bundled static
+assets via Vite (`import banner from "../../assets/x.png"`).
+
 ---
 
 # Redux Rules

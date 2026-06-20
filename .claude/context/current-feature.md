@@ -1,67 +1,48 @@
 ## Current Feature
 
-**Checkout, Orders & Payments (COD + Stripe)** (spec: `009-checkout-order.md`)
+**Home Page (Banner + Product Sections)** (spec: `010-home-page.md`)
 
-Branch: `feature/checkout-order` (cut from `main`).
+Branch: `feature/home-page` (cut from `main`).
 
-The full purchase flow from the cart's CHECKOUT button to a placed, reviewable, cancellable order. Backend adds three modules — `payment` (`StripeService`, leaf), `checkout` (summary + coupon apply/remove + create-payment-intent, with `CouponService`), and `order` (place-COD / list / detail / cancel + the `/payment/webhook` controller). **COD** places immediately (payment `PENDING`); **card** creates a Stripe PaymentIntent (context in metadata) and the order is placed by the `payment_intent.succeeded` **webhook** (payment `PAID`); **cancel** restocks synchronously for COD and via a **real, webhook-driven Stripe refund** (`charge.refunded`) for paid orders. Frontend adds `@stripe/*`, the `checkout` + `order` features, the Checkout page (COD + Stripe Elements), Orders history (replaces the placeholder) and Order detail. **No schema migration** — every model already exists. Screenshots are the source of truth (`checkout_cod_ui.png`, `checkout_stripe_ui.png`, `stripe_payment_ui.png`, `order_history_ui.png`, `order_detail_ui.png`).
+Replace the placeholder [HomePage.tsx](../../frontend/src/pages/Home/HomePage.tsx) with the full landing page that matches `homepage_lower_section_ui.png`: a top banner rendered from `frontend/src/assets/hero_section.png` (with its two baked-in buttons made interactive via transparent overlay hotspots → `/product/All`), followed by five static product-card rows (Popular Picks, Wear Your Favourite Team, Style in Motion, Mobiles, Laptops), five cards each, clicking a card navigates to its category page. **Frontend-only** — no backend, API, Redux, or schema work. Card images are the static flixcart.com URLs from the raw spec TSX; card targets remapped to **valid** category slugs (`clothing`, `footwear`, `mobile-phones`, `laptops`). No duplicate footer — `MainLayout` already renders the global footer.
 
 ## Status
 
-**Done** — all 7 workflow phases complete (spec approved → implemented → tested → reviewed → context refined → finalized). See History entry 11. Ready for commit + PR.
+**Done** — all 7 workflow phases complete (spec approved → implemented → tested → reviewed → context refined → finalized). See History entry 12. Ready for commit + PR.
 
 ## Goal
 
-Deliver checkout + orders + payments end-to-end. Backend: feature-isolated `payment` / `checkout` / `order` modules (thin controllers, logic in services, `PrismaService` only, no `any`, contracts in each module's `types/`, copy in new `CheckoutMessages`/`OrderMessages`/`CouponMessages`, `JwtAuthGuard` + `assertActiveUser` on every authenticated op; identity from `@CurrentUser()` only; ownership-scoped reads/writes → 404 on foreign ids; Serializable `$transaction`s for all placement/cancel/refund). Stripe via the `stripe` SDK (PaymentIntent + signed webhook + refund); `main.ts` `rawBody: true`. Frontend: `features/checkout/` + `features/order/` (slice/service/types) mirroring the cart/address architecture, Stripe Elements `<PaymentElement/>`, the Checkout/Orders/OrderDetail pages, and the cart→checkout + navbar Orders wiring. See `specs/009-checkout-order.md` for the full Definition of Done.
+Ship a screenshot-faithful homepage as the post-login landing surface. Banner image full-width with two working overlay buttons; five themed sections driven by a typed, in-file `HOME_SECTIONS` data structure (no repeated JSX); each card keyboard-accessible and navigating to a real category. CSS Modules + theme tokens only, responsive, TypeScript strict (no `any`), no new dependencies. See `specs/010-home-page.md` for the full Definition of Done.
 
 ## Scope / Plan
 
-### Confirmed decisions
+### Confirmed decisions (Phase-1 Q&A)
 
-1. **Invoice email/PDF deferred** — no `mail` module this feature.
-2. **Cancel of a paid order = real Stripe refund, webhook-driven** (`charge.refunded` → CANCELLED + payment REFUNDED + restock + coupon release, idempotent). COD/unpaid cancel is synchronous (CANCELLED + restock + coupon release in one Serializable txn).
-3. **Coupon = full enforcement** — active / not-expired / min-order / `usage_limit`, plus one-use-per-user via `CouponUsage` (+ `used_count` increment) on placement; **released on cancel**. Coupon re-verified on every `GET /checkout`; invalid coupon cleared from `cart.applied_coupon`.
-4. **Stripe context in PaymentIntent metadata** (`user_id`, `address_id`, `coupon_code`); order created **only** in the webhook on success; idempotency via unique `Payment.stripe_payment_id`. Stock-fail in webhook → auto-refund, no order (D7).
-5. **Shipping** = ₹100 when **pre-coupon `sub_total` < ₹500**, else free.
-6. **No schema migration** (D1). Display Order ID (`#A2224894`) derived from `order_id` (first 8 hex chars, upper-cased). Money as `"0.00"` strings; FE renders 2dp Indian grouping (`formatMoney`) — distinct from the rounded `formatPrice` on listings (D2). `purchase_price` = final unit price `max(0, price − variant.discount)`; checkout "Discount" line is coupon-only (D3). Out-of-stock = `stock === 0` (overlay + excluded); placement re-validates `stock >= qty` (D4). Order item brand/image/attributes read live from the variant; only name + price snapshotted (D5). "Add Address" on checkout = inline `AddressForm` reuse (D6).
+1. **Data source — static.** Hardcode the image URLs + category targets from the raw spec TSX. No API/Redux.
+2. **Banner — image + interactive hotspots.** `hero_section.png` full-width; two transparent absolutely-positioned `<button>`s over the artwork's buttons, both → `navigate('/product/All')` (the artwork's text/CTAs are baked into the image, not re-created as DOM).
+3. **Card rows — static five cards.** No horizontal scroll / arrow / load-more (the TSX comments' behaviour is deferred).
+4. **Category slug correction.** Raw TSX targets are invalid slugs → remapped: `Clothing→clothing`, `Shoes→footwear`, `Mobile→mobile-phones`, `Laptop→laptops` (valid per `frontend/src/constants/categories.ts`).
+5. **No second footer** — `MainLayout` already provides the global footer; the raw TSX's inline footer is dropped.
 
-### Backend — `payment` / `checkout` / `order` (`backend/src/`)
-
-```
-payment (leaf) ──exports StripeService
-   ▲   ▲
-   │   └── checkout ──exports CheckoutService, CouponService
-   │          ▲
-   └── order ─┘     (order imports payment + checkout)
-```
-
-- **`payment`** — `StripeService` (createPaymentIntent, retrievePaymentIntent, createRefund, constructWebhookEvent). `ConfigService` only.
-- **`checkout`** — `CheckoutService` + `CouponService` + controller: `GET /checkout`, `POST`/`DELETE /checkout/coupon`, `POST /checkout/payment-intent`.
-- **`order`** — `OrderService` + controller (`POST /order` COD, `GET /order` paginated, `GET /order/:orderId`, `PATCH /order/:orderId/cancel`) + `OrderWebhookController` (`POST /payment/webhook`: `payment_intent.succeeded` → place; `charge.refunded` → finalize refund).
-
-Register all three in `AppModule`. Add `stripe` dep; `NestFactory.create(..., { rawBody: true })`; Stripe env keys via `getOrThrow`. `SHIPPING_FEE`/`FREE_SHIPPING_THRESHOLD` in `values.constant.ts`. Contracts: `CheckoutSummary`/`CheckoutItem`/`AppliedCoupon`, `OrderListItem`/`OrderItemView`/`OrderDetail`.
-
-### Frontend — checkout + order
+### Frontend — Home page (`frontend/src/`)
 
 ```
 frontend/src/
-├── features/checkout/{checkoutSlice,checkoutService,types}.ts
-├── features/order/{orderSlice,orderService,types}.ts
-├── types/{checkout.types,order.types}.ts
-├── pages/Checkout/CheckoutPage.tsx (+ .module.css)        // /checkout
-├── pages/Orders/{OrdersPage,OrderDetailPage}.tsx (+ css)  // /orders, /orders/:orderId
-├── services/stripe.ts            // memoised loadStripe
-├── routes/router.tsx             // add /checkout, /orders (real), /orders/:orderId
-├── store/store.ts                // register checkout + order reducers
-├── utils/format.ts               // formatMoney, formatOrderNumber
-└── vite-env.d.ts                 // VITE_STRIPE_PUBLISHABLE_KEY
+├── pages/Home/HomePage.tsx        // rewrite: banner + 5 sections from HOME_SECTIONS
+├── pages/Home/Home.module.css     // rewrite: page, banner (relative + absolute hotspots),
+│                                  //          section heading, card row, product card
+└── assets/hero_section.png        // existing banner asset
 ```
 
-- Deps `@stripe/stripe-js` + `@stripe/react-stripe-js`; `VITE_STRIPE_PUBLISHABLE_KEY` in `frontend/.env`.
-- `checkoutSlice`/`orderSlice` follow the cart pattern (`ApiResult<T>`, `NETWORK_ERROR`, toasts via `.unwrap()`, reset on logout/sessionExpired/deleteUser); 401 handled by the existing `authExpiryMiddleware`.
-- Checkout page matches the 3 checkout screenshots (read-only personal info, address picker + inline Add, COD/Card radios, shopping bag, promo code apply/remove, out-of-stock overlay). COD → place + redirect to `/orders/:id`; card → create-intent → `<Elements><PaymentElement/></Elements>` → confirm → `/orders`. On placement: `dispatch(fetchCart())` to reset the badge.
-- Orders page (replaces placeholder) + Order detail per screenshots (+ status/totals/address extras on detail — D, approved). Cart CHECKOUT → `navigate('/checkout')`.
-- CSS Modules + theme tokens only; responsive.
+- Typed model (no `any`): `HomeCard { image, alt, category }`, `HomeSection { title, cards }`; `const HOME_SECTIONS: HomeSection[]` mapped to JSX.
+- Banner: `<img>` of `hero_section.png` in a relative wrapper; two transparent overlay buttons (aria-labelled) positioned over the artwork buttons → `/product/All`.
+- Each card: `<img>` with `alt` + click → `navigate('/product/<category>')`; button semantics / focusable.
+- Section → card mapping (image URLs + per-card slug) is enumerated in `specs/010-home-page.md`.
+- CSS Modules + theme tokens (`--color-*`, `--space-*`, `--radius-*`) only; responsive; matches the screenshot rhythm.
+
+### Visual source of truth
+
+`.claude/screenshots/homepage_lower_section_ui.png` (sections + 5-card rows) and `homepage_ui.png` (overall rhythm). Banner artwork comes from `hero_section.png`, not the screenshot.
 
 ---
 
@@ -202,3 +183,11 @@ Full cart experience: a backend `cart` module (view / add / update-qty / remove)
    - **Review (Phase 5) fixes applied (user-approved):** added the `order_coupon_ref` migration + coupon release on cancel (`CouponService.releaseUsage`, called in `restockAndCancel`); **narrowed the `placeStripeOrder` catch** to refund only on `BadRequestException` (a duplicate `P2002`/serialization `P2034` no longer erroneously refunds a placed order — re-thrown so Stripe retries); UUID-validate webhook metadata; `@HttpCode(200)` on cancel; de-duped the double `assertActiveUser` in coupon apply/remove (`composeSummary`); FE: `creatingIntent` flag (guards double-tap PaymentIntents), Stripe `processing` status handled, stable `order_item_id` keys, attribute spacing, coupon Enter-to-apply + aria-label, hardcoded colors → new `--color-overlay-dark`/`--color-primary-light-subtle` tokens, `<th scope>`, radio `value` attrs, narrow-screen table treatment, focus-visible states.
    - **Self-improvement (Phase 6):** refined `prisma-schema.md` + `database-design.md` (Order↔Coupon), `business-rules.md` (coupon lifecycle + shipping fee + Stripe webhook placement + cancellation mechanics), `development-rules.md` (module graph + Stripe webhook rules), `testing-patterns.md` (4 new patterns: webhook rawBody/Content-Type, `$transaction` callback-vs-array mocks, Playwright route globs + exact-text), and corrected the 009 spec's migration note.
    - **Deferred (out of scope / follow-ups from review):** invoice email + PDF; `@@unique([stripe_payment_id])` migration (DB-level idempotency, currently app-guarded); `@@index([user_id, created_at])` for order history; single-query order detail; cross-cutting debt (`ApiResult<T>` now 5×, `assertActiveUser` 6×, `pickPrimaryImage`/`asAttributeRecord` 4×) — extraction recommended in a dedicated cleanup pass.
+
+12. **Home Page — Banner + Product Sections** — *Done* (spec `010-home-page.md`). Branch `feature/home-page` (cut from `main`). **Frontend-only** — replaces the placeholder `pages/Home/HomePage.tsx` with the full post-login landing page matching `homepage_lower_section_ui.png`: a full-width banner above five themed product-card rows.
+   - **Implementation:** `HomePage.tsx` + `Home.module.css` rewritten. Banner renders the bundled `assets/hero_section.png` (imported via Vite, `fetchPriority="high"` as the LCP element) with two **transparent overlay `<button>` hotspots** percentage-positioned over the artwork's baked-in "Start Finding Now" / "Browse Categories" buttons — both `navigate('/product/All')`. Below it, five sections (Popular Picks, Wear Your Favourite Team, Style in Motion, Mobiles, Laptops) driven by a typed in-file `HOME_SECTIONS: HomeSection[]` (no repeated JSX); each card is a focusable `<button><img></button>` that navigates to its category. Responsive grid 5→4→2 cols; CSS Modules + theme tokens only; semantic `<h2>` section headings; `loading="lazy"` + `onError` (hide broken-image glyph) on card images. **No new dependencies, no backend/Redux/schema.**
+   - **Confirmed decisions (Phase-1 Q&A):** card images are the **static** flixcart.com URLs from the raw spec TSX (no backend fetch); banner is the image as-is with overlay hotspots (its text/CTAs are baked into the artwork, not re-created as DOM); static five-card rows (no scroll/arrow/load-more); **category slug correction** — the raw TSX's invalid `Clothing`/`Shoes`/`Mobile`/`Laptop` targets remapped to real slugs `clothing`/`footwear`/`mobile-phones`/`laptops` (from `constants/categories.ts`) so clicks land on populated pages; **no second footer** (`MainLayout` provides the global one).
+   - **Tests:** Vitest/RTL unit (`HomePage.test.tsx`, 30 — banner img + both hotspots → `/product/All`, five headings in order, exactly 5 cards/section, per-category navigation, alt/aria coverage) + Playwright e2e (`e2e/home-page.spec.ts`, 12 — access-control redirect, banner nav, card nav, route-mocked session). **All green: frontend 412+ unit / 141 e2e; lint 0 errors + build clean.** Two patterns appended to `testing-patterns.md` (`useNavigate` spy via `importOriginal`; Playwright aria-label attribute selector for uniform card grids).
+   - **Review (Phase 5) fixes applied (user-approved A–F + H):** `<div><span>`→semantic `<h2>` headings; fixed a copy-paste alt bug ("Motorola 60 Pro" on a laptop → "Premium laptop") + made generic "Popular pick"/"Team jersey"/Style-in-Motion alts distinct; stable `key={card.image}`; banner-hotspot `:hover` affordance (reuses `--shadow-focus-accent`, no hardcoded colour); `fetchPriority="high"` on banner; tablet breakpoint 3→**4** cols; card-image `onError` fallback. **G (banner `max-height`) deliberately skipped** — the only height cap is `object-fit: cover`, which crops the artwork and would shift the baked-in buttons out from under the percentage hotspots; the banner is already bounded by the 1200px container.
+   - **Self-improvement (Phase 6):** fixed a stale code comment (`messages.constant.ts` — checkout no longer "a later feature") and added a Frontend rule documenting presentational-only pages (local typed constant, no slice/service when there's no server state) + Vite static-asset imports.
+   - **Outstanding (needs live visual tuning):** the two banner hotspot positions (`top: 64%`, `left: 56.5%`/`74.5%`) and the card `aspect-ratio: 4/5` are estimates — best nudged in the running app against `hero_section.png` / the screenshot. Deferred app-wide follow-ups from review: CSP `img-src`/`script-src` (first external image origin lands here), `--text-*`/`--layout-max-width` tokens, focus-ring opacity (WCAG); flixcart CDN sees the authenticated user's IP per image (inherent to the "use the TSX links" decision).

@@ -218,3 +218,22 @@ A `page.route()` **string** glob is an exact match unless it has a wildcard, so 
 ## Playwright getByText Is Case-Insensitive Substring [order-module]
 
 `page.getByText("Jane")` also matches `jane@example.com` (case-insensitive + substring) → a strict-mode "resolved to 2 elements" failure. Use `getByText("Jane", { exact: true })` when a value is a substring of another on the page.
+
+## useNavigate Spy Pattern for Static Page Tests [home-page]
+
+For components that call `useNavigate()` with no Redux dependency, mock only `useNavigate` using `importOriginal` to keep all other react-router-dom exports intact. The `renderWithProviders` MemoryRouter still works because all other hooks/components are real:
+
+```ts
+const mockNavigate = vi.fn();
+
+vi.mock("react-router-dom", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("react-router-dom")>();
+  return { ...actual, useNavigate: () => mockNavigate };
+});
+```
+
+Call `vi.clearAllMocks()` in `beforeEach` when `mockNavigate` is shared across tests. Assert with `expect(mockNavigate).toHaveBeenCalledWith("/product/All")`.
+
+## Playwright aria-label Attribute Selector for Card Grids [home-page]
+
+When a page renders a grid of `<button>` elements that cannot be distinguished by role alone, use a CSS attribute selector anchored to a substring of the aria-label to scope locators: `page.locator('button[aria-label*="shop mobile-phones"]')`. This avoids strict-mode locator conflicts and does not require `getByRole` when each button has a unique partial label. Pair with `.first()` when the first item in the section is sufficient for the navigation assertion.

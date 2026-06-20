@@ -25,7 +25,7 @@ export const CartMessages = {
   addSuccess: "Added to cart",
   /** Remove-item action label. */
   removeItem: "Remove Item",
-  /** Checkout button label (checkout itself is a later feature). */
+  /** Checkout button label. */
   checkout: "CHECKOUT",
   /** Stock status labels on a cart line. */
   inStock: "In Stock",
