@@ -48,9 +48,7 @@
   left: 74.5%;
 }
 
-/* Subtle affordance so the baked-in buttons read as interactive (incl. touch),
-   reusing the shared accent ring rather than a hardcoded colour. */
-.bannerHotspot:hover,
+/* Keyboard focus ring only — no hover effect over the artwork's buttons. */
 .bannerHotspot:focus-visible {
   outline: none;
   box-shadow: var(--shadow-focus-accent);
@@ -86,7 +84,9 @@
   overflow: hidden;
   background: var(--color-surface-card);
   cursor: pointer;
-  aspect-ratio: 4 / 5;
+  /* Per-section ratio (set on .cardRow) matches the source image dimensions so
+     the image fills the card edge-to-edge with no crop and no empty space. */
+  aspect-ratio: var(--card-ratio, 3 / 4);
   transition:
     transform 0.15s ease,
     box-shadow 0.15s ease;
@@ -106,7 +106,30 @@
   display: block;
   width: 100%;
   height: 100%;
+  /* Card ratio matches the image ratio, so `cover` fills the card without
+     cropping content or leaving empty space. */
   object-fit: cover;
+}
+
+/* Per-section card ratios, matching each section's source image dimensions. */
+.ratioPopular {
+  --card-ratio: 700 / 860;
+}
+
+.ratioTeam {
+  --card-ratio: 700 / 1060;
+}
+
+.ratioStyle {
+  --card-ratio: 1668 / 2220;
+}
+
+.ratioMobile {
+  --card-ratio: 700 / 800;
+}
+
+.ratioLaptop {
+  --card-ratio: 700 / 1060;
 }
 
 /* ---- Responsive ---- */

@@ -22,12 +22,15 @@ interface HomeCard {
 
 interface HomeSection {
   title: string;
+  /** CSS-module class that sets `--card-ratio` to this section's image ratio. */
+  ratioClass: string;
   cards: HomeCard[];
 }
 
 const HOME_SECTIONS: HomeSection[] = [
   {
     title: "Popular Picks",
+    ratioClass: "ratioPopular", // 700 × 860
     cards: [
       {
         image:
@@ -63,6 +66,7 @@ const HOME_SECTIONS: HomeSection[] = [
   },
   {
     title: "Wear Your Favourite Team",
+    ratioClass: "ratioTeam", // 700 × 1060
     cards: [
       {
         image:
@@ -98,6 +102,7 @@ const HOME_SECTIONS: HomeSection[] = [
   },
   {
     title: "Style in Motion",
+    ratioClass: "ratioStyle", // 1668 × 2220
     cards: [
       {
         image:
@@ -133,6 +138,7 @@ const HOME_SECTIONS: HomeSection[] = [
   },
   {
     title: "Mobiles",
+    ratioClass: "ratioMobile", // 700 × 800
     cards: [
       {
         image:
@@ -168,6 +174,7 @@ const HOME_SECTIONS: HomeSection[] = [
   },
   {
     title: "Laptops",
+    ratioClass: "ratioLaptop", // 700 × 1060
     cards: [
       {
         image:
@@ -237,7 +244,7 @@ function HomePage() {
       {HOME_SECTIONS.map((section) => (
         <section key={section.title} className={styles.section}>
           <h2 className={styles.sectionHeader}>{section.title}</h2>
-          <div className={styles.cardRow}>
+          <div className={`${styles.cardRow} ${styles[section.ratioClass]}`}>
             {section.cards.map((card) => (
               <button
                 type="button"
