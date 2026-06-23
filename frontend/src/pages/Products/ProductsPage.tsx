@@ -7,6 +7,7 @@ import {
 } from "../../features/products/productsSlice";
 import FilterSidebar from "../../components/FilterSidebar/FilterSidebar";
 import Pagination from "../../components/Pagination/Pagination";
+import NoResults from "../../components/NoResults";
 import { ProductMessages } from "../../constants/messages.constant";
 import { formatDiscountBadge, formatPrice } from "../../utils/format";
 import { resolveImageUrl } from "../../utils/image";
@@ -126,7 +127,7 @@ function ProductsPage() {
         )}
 
         {!listLoading && !listError && items.length === 0 && (
-          <p className={styles.status}>{ProductMessages.emptyResults}</p>
+          <NoResults searchQuery={search} />
         )}
 
         {!listLoading && !listError && items.length > 0 && (
