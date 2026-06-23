@@ -19,6 +19,10 @@ export const CartMessages = {
   priceDetails: "PRICE DETAILS",
   /** Empty-cart heading (matches `empty_cart_ui.png`). */
   empty: "Your Cart is empty",
+  /** Empty-cart supporting line. */
+  emptyBody: "Browse the catalog and add items to get started.",
+  /** Empty-cart call-to-action label. */
+  emptyCta: "Continue shopping",
   /** Shown while the cart is loading. */
   loading: "Loading…",
   /** Brief confirmation after a successful add-to-cart. */
