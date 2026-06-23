@@ -1,0 +1,31 @@
+.row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.price {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.price.lg {
+  font-size: 1.3rem;
+}
+
+.strike {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  text-decoration: line-through;
+}
+
+.discount {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  color: var(--color-success);
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: nowrap;
+}

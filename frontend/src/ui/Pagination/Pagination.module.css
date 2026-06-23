@@ -1,0 +1,61 @@
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  list-style: none;
+  margin: var(--space-6) 0 0;
+  padding: 0;
+}
+
+.page,
+.nav,
+.break {
+  list-style: none;
+}
+
+.pageLink,
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 38px;
+  height: 38px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background-color: var(--color-surface-card);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.pageLink:hover,
+.navLink:hover {
+  border-color: var(--color-primary);
+}
+
+/* Active page uses the primary color. */
+.active .pageLink {
+  background-color: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-on-primary);
+}
+
+.break {
+  color: var(--color-text-muted);
+  padding: 0 var(--space-1);
+}
+
+.disabled .navLink {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.disabled .navLink:hover {
+  border-color: var(--color-border);
+}

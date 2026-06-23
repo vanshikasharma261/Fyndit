@@ -1,0 +1,28 @@
+.pill {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.pending {
+  background-color: var(--color-accent-subtle);
+  color: var(--color-accent);
+}
+
+.confirmed {
+  background-color: var(--color-primary-light-subtle);
+  color: var(--color-primary-light);
+}
+
+.shipped {
+  background-color: var(--color-success-subtle);
+  color: var(--color-success);
+}
+
+.cancelled {
+  background-color: var(--color-error-subtle);
+  color: var(--color-error);
+}
