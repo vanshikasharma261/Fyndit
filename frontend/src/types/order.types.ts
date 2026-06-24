@@ -7,13 +7,7 @@
 import type { ErrorResponse, ValidationErrorResponse } from "./auth.types";
 import type { AddressResponse } from "./address.types";
 
-export type OrderStatus =
-  | "PENDING"
-  | "CONFIRMED"
-  | "PACKED"
-  | "SHIPPED"
-  | "DELIVERED"
-  | "CANCELLED";
+export type { OrderStatus } from "../ui";
 
 export type PaymentMethod = "COD" | "STRIPE";
 

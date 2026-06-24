@@ -9,5 +9,6 @@
     "outDir": "dist-ui",
     "rootDir": "src/ui"
   },
-  "include": ["src/ui"]
+  "include": ["src/ui"],
+  "exclude": ["src/ui/**/*.test.ts", "src/ui/**/*.test.tsx"]
 }

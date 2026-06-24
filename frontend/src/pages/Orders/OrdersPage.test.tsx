@@ -193,10 +193,10 @@ describe("OrdersPage — populated list", () => {
     expect(screen.getByText("01 Jun 2026")).toBeInTheDocument();
   });
 
-  it("renders status pill for each row", () => {
+  it("renders StatusBadge (title-cased) for each row", () => {
     renderPopulated();
-    expect(screen.getByText("PENDING")).toBeInTheDocument();
-    expect(screen.getByText("DELIVERED")).toBeInTheDocument();
+    expect(screen.getByText("Pending")).toBeInTheDocument();
+    expect(screen.getByText("Delivered")).toBeInTheDocument();
   });
 
   it("renders attributes for each row", () => {

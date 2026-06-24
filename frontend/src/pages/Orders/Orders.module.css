@@ -120,33 +120,6 @@
   font-weight: 600;
 }
 
-/* Status pill */
-
-.statusPill {
-  display: inline-block;
-  padding: var(--space-1) var(--space-3);
-  border-radius: var(--radius-pill);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  background-color: var(--color-accent-subtle);
-  color: var(--color-accent);
-}
-.status_CONFIRMED,
-.status_PACKED {
-  background-color: var(--color-primary-light-subtle);
-  color: var(--color-primary-light);
-}
-.status_SHIPPED,
-.status_DELIVERED {
-  background-color: var(--color-success-subtle);
-  color: var(--color-success);
-}
-.status_CANCELLED {
-  background-color: var(--color-error-subtle);
-  color: var(--color-error);
-}
-
 /* Row actions */
 
 .actions {
