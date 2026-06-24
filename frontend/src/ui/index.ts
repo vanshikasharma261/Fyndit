@@ -55,3 +55,10 @@ export type {
 
 export { default as AddressCard } from "./AddressCard/AddressCard";
 export type { AddressCardProps, Address } from "./AddressCard/AddressCard";
+
+export { default as Timeline } from "./Timeline/Timeline";
+export type {
+  TimelineProps,
+  TimelineStep,
+  TimelineStepState,
+} from "./Timeline/Timeline";

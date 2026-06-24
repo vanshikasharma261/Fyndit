@@ -184,6 +184,7 @@ export const OrderMessages = {
   orderId: "ORDER ID",
   paymentMethod: "PAYMENT METHOD",
   status: "STATUS",
+  orderStatus: "Order status",
   qty: "Qty:",
   subtotal: "Subtotal",
   discount: "Discount",

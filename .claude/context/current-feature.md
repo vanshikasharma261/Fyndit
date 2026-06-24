@@ -1,48 +1,57 @@
 ## Current Feature
 
-**Home Page (Banner + Product Sections)** (spec: `010-home-page.md`)
+**Order Tracking Timeline** (spec: `011-order-tracking-timeline.md`)
 
-Branch: `feature/home-page` (cut from `main`).
+Branch: `feature/order-tracking-timeline` (cut from `feat/ui-design-system`, which carries the design-system foundation this feature exercises — not from `main`, so the new `design-system.md` / workflow context travels with it).
 
-Replace the placeholder [HomePage.tsx](../../frontend/src/pages/Home/HomePage.tsx) with the full landing page that matches `homepage_lower_section_ui.png`: a top banner rendered from `frontend/src/assets/hero_section.png` (with its two baked-in buttons made interactive via transparent overlay hotspots → `/product/All`), followed by five static product-card rows (Popular Picks, Wear Your Favourite Team, Style in Motion, Mobiles, Laptops), five cards each, clicking a card navigates to its category page. **Frontend-only** — no backend, API, Redux, or schema work. Card images are the static flixcart.com URLs from the raw spec TSX; card targets remapped to **valid** category slugs (`clothing`, `footwear`, `mobile-phones`, `laptops`). No duplicate footer — `MainLayout` already renders the global footer.
+Add a visual order-status timeline to the order detail screen, built as a new **reusable `@/ui` `Timeline` primitive** and published back to the Fyndit Design System. **Frontend-only** — derived from the order's existing single `status` field (no backend, migration, or new endpoint). This is the **first feature to run the new design→code workflow**: the timeline was prototyped and approved in claude.ai/design (Phase 2) before implementation.
 
 ## Status
 
-**Done** — all 7 workflow phases complete (spec approved → implemented → tested → reviewed → context refined → finalized). See History entry 12. Ready for commit + PR.
+**Done** — All 8 phases complete (spec → design → implement → test → review → self-improve → finalize). Lint/build/build:ui clean; 499 unit/RTL tests + 40 Playwright e2e tests passing.
 
 ## Goal
 
-Ship a screenshot-faithful homepage as the post-login landing surface. Banner image full-width with two working overlay buttons; five themed sections driven by a typed, in-file `HOME_SECTIONS` data structure (no repeated JSX); each card keyboard-accessible and navigating to a real category. CSS Modules + theme tokens only, responsive, TypeScript strict (no `any`), no new dependencies. See `specs/010-home-page.md` for the full Definition of Done.
+Give order detail a screenshot-/design-faithful status stepper (`Placed → Confirmed → Packed → Shipped → Delivered`, with `CANCELLED` as a terminal node), via a generic token-styled `Timeline` primitive that any future lifecycle view can reuse. TypeScript strict (no `any`), CSS Modules + tokens only, no new dependencies, no inline styles in app code. See `specs/011-order-tracking-timeline.md` for the full Definition of Done.
 
 ## Scope / Plan
 
 ### Confirmed decisions (Phase-1 Q&A)
 
-1. **Data source — static.** Hardcode the image URLs + category targets from the raw spec TSX. No API/Redux.
-2. **Banner — image + interactive hotspots.** `hero_section.png` full-width; two transparent absolutely-positioned `<button>`s over the artwork's buttons, both → `navigate('/product/All')` (the artwork's text/CTAs are baked into the image, not re-created as DOM).
-3. **Card rows — static five cards.** No horizontal scroll / arrow / load-more (the TSX comments' behaviour is deferred).
-4. **Category slug correction.** Raw TSX targets are invalid slugs → remapped: `Clothing→clothing`, `Shoes→footwear`, `Mobile→mobile-phones`, `Laptop→laptops` (valid per `frontend/src/constants/categories.ts`).
-5. **No second footer** — `MainLayout` already provides the global footer; the raw TSX's inline footer is dropped.
+1. **Frontend-only, derived.** Timeline computed from the single current `status`; only "Placed" shows a real date (`created_at`). No `OrderStatusHistory` table/migration (deferred).
+2. **New generic `@/ui` `Timeline` primitive** (vs an inline/page-specific component) — exercises the add-a-primitive + design-sync pipeline.
+3. **`CANCELLED` → `Placed ✓ → ✕ Cancelled`** terminal node (middle steps dropped — no history of how far it progressed).
 
-### Frontend — Home page (`frontend/src/`)
+### Implemented (Phase 4)
 
-```
-frontend/src/
-├── pages/Home/HomePage.tsx        // rewrite: banner + 5 sections from HOME_SECTIONS
-├── pages/Home/Home.module.css     // rewrite: page, banner (relative + absolute hotspots),
-│                                  //          section heading, card row, product card
-└── assets/hero_section.png        // existing banner asset
-```
+- **`frontend/src/ui/Timeline/`** (`Timeline.tsx` + `Timeline.module.css`) — generic, prop-driven, token-styled, decoupled; lucide `Check`/`X`; the connector into a `complete` step fills (`--color-success`); states `complete`/`current`/`upcoming`/`cancelled`. Exported from the `ui` barrel (`TimelineProps`/`TimelineStep`/`TimelineStepState`).
+- **`pages/Orders/orderTimeline.ts`** — `buildOrderTimeline(status, createdAt)` derivation (covers all statuses incl. the `DELIVERED`-complete and `CANCELLED`-terminal cases).
+- **`OrderDetailPage`** — renders the timeline in a `.timelineCard`; the inline `statusPill` was **replaced with `@/ui` `StatusBadge`** (closed a reuse gap). Added `OrderMessages.orderStatus` + `.timelineCard`/`.timelineLabel`.
+- **Design-sync** — `.design-sync/previews/Timeline.tsx` (4 states), `conventions.md` + `ui/README.md` updated; `npm run build:ui` clean. _Re-sync to the Fyndit Design System project still pending (run from repo root per `.design-sync/NOTES.md`)._
 
-- Typed model (no `any`): `HomeCard { image, alt, category }`, `HomeSection { title, cards }`; `const HOME_SECTIONS: HomeSection[]` mapped to JSX.
-- Banner: `<img>` of `hero_section.png` in a relative wrapper; two transparent overlay buttons (aria-labelled) positioned over the artwork buttons → `/product/All`.
-- Each card: `<img>` with `alt` + click → `navigate('/product/<category>')`; button semantics / focusable.
-- Section → card mapping (image URLs + per-card slug) is enumerated in `specs/010-home-page.md`.
-- CSS Modules + theme tokens (`--color-*`, `--space-*`, `--radius-*`) only; responsive; matches the screenshot rhythm.
+### Verified
 
-### Visual source of truth
+- `build:ui` clean (Timeline in the ESM bundle + `.d.ts`); app `npm run lint` (0 errors; 3 warnings are pre-existing, in generated `coverage/`) + `npm run build` (`tsc -b` + vite) clean.
+- Design prototype rendered & **approved** in claude.ai/design — `templates/order-tracking/OrderTracking.dc.html` (verify loop passed: only a favicon 404).
 
-`.claude/screenshots/homepage_lower_section_ui.png` (sections + 5-card rows) and `homepage_ui.png` (overall rhythm). Banner artwork comes from `hero_section.png`, not the screenshot.
+### Known follow-ups / deferred
+
+- **Re-sync to claude.ai/design** — run `npm run build:ui` then re-sync from repo root (per `.design-sync/NOTES.md`) to publish `Timeline` to the live Fyndit Design System project.
+- **`OrdersPage` → `StatusBadge` migration** — the order history list still renders the inline `statusPill` + `status_*` CSS classes; migrate to `StatusBadge` (the reuse gap the detail page already closed).
+- **`StatusBadge` `OrderStatus` duplication** — `StatusBadge.tsx` re-declares `OrderStatus`; should import from `frontend/src/types/order.types.ts`. Noted in `design-system.md`.
+- `Timeline` is horizontal-only (the `orientation` prop from the draft spec was trimmed — YAGNI); revisit if a vertical lifecycle view appears.
+
+---
+
+13. **Order Tracking Timeline** — *Done* (spec `011-order-tracking-timeline.md`). Branch `feature/order-tracking-timeline` (cut from `feat/ui-design-system`). **Frontend-only, no backend/migration.** First feature to run the new 8-phase design→code workflow.
+   - **New `@/ui` Timeline primitive** (`frontend/src/ui/Timeline/`) — generic horizontal lifecycle stepper; props: `steps: TimelineStep[]`, `ariaLabel?`. States: `complete`/`current`/`upcoming`/`cancelled`. Lucide `Check`/`X` icons; connector after a `complete` step fills `--color-success`; CSS Modules + tokens only; decoupled from Redux/Router/Stripe. Exported from the barrel; design-sync updated (preview, `conventions.md`, `README.md`).
+   - **`buildOrderTimeline(status, createdAt)`** (`pages/Orders/orderTimeline.ts`) — pure derivation. Lifecycle: `PENDING→CONFIRMED→PACKED→SHIPPED→DELIVERED`. CANCELLED: 2-node `[Placed ✓, Cancelled ✗]`. DELIVERED: all complete. Only "Placed" step carries the formatted `createdAt` caption.
+   - **`OrderDetailPage` reformed:** replaced inline `statusPill` with `@/ui` `StatusBadge` (closed reuse gap); added `.timelineCard` section housing `<Timeline>` above the items card.
+   - **Design flow (Phase 2):** prototype approved in claude.ai/design using `window.FynditUI.Timeline` + tokens before any implementation.
+   - **Critical connector bug found and fixed in review:** `outgoingDone` was `steps[index+1].state === "complete"` — caused a grey gap between the last complete node and the current dot on any in-progress order. Fixed to `step.state === "complete"`.
+   - **Tests:** 499 unit/RTL + 40 Playwright e2e all passing. 100% coverage on `orderTimeline.ts`; 100%/96% branches on `Timeline.tsx`.
+   - **Self-improvement:** `design-system.md` updated — component count 14→15, `Timeline` added to catalog, `@/ui` import shorthand corrected to actual relative-path imports (no alias configured), connector fill semantics documented, known gaps section added (`OrderStatus` duplication, no font-size/sizing token scale).
+   - **Deferred:** re-sync to claude.ai/design; `OrdersPage` migration to `StatusBadge`; `StatusBadge` `OrderStatus` import migration.
 
 ---
 

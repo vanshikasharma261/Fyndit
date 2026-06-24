@@ -21,7 +21,7 @@ const { ProductCard, Button, OrderSummary, Card } = window.FynditUI;
 
 `Button` · `Badge` · `StatusBadge` · `PriceTag` · `Card` · `ProductCard` ·
 `QuantityStepper` · `TextField` · `SelectField` · `OrderSummary` · `EmptyState` ·
-`Pagination` · `FilterSidebar` · `AddressCard`
+`Pagination` · `FilterSidebar` · `AddressCard` · `Timeline`
 
 Each component's `<Name>.d.ts` is the exact prop contract and `<Name>.prompt.md`
 has usage notes + examples — read those before composing a component.
@@ -56,6 +56,10 @@ The accent (`--color-accent`) is for primary CTAs and highlights; the navy
 - `ProductCard` — `name`, `brand`, `description`, `imageUrl`, `price`, `compareAt`.
 - Form fields (`TextField`, `SelectField`) take `label` + `error` and own their
   focus ring; don't wrap them in your own label.
+- `Timeline` — `steps`: an ordered array of `{ label, caption?, state }`, where
+  `state` is `complete` | `current` | `upcoming` | `cancelled`. The caller resolves
+  each step's state; the connector fills (`success`) into a `complete` step. Horizontal
+  lifecycle stepper (e.g. order tracking).
 
 ## One idiomatic example
 

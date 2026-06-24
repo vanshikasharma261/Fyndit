@@ -1,0 +1,121 @@
+.track {
+  display: flex;
+  align-items: flex-start;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+}
+
+.step {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-2);
+}
+
+.node {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.connector {
+  flex: 1 1 auto;
+  height: 2px;
+  background-color: var(--color-border);
+}
+
+.connectorHidden {
+  visibility: hidden;
+}
+
+.connectorDone {
+  background-color: var(--color-success);
+}
+
+.dot {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  box-sizing: border-box;
+  background-color: var(--color-surface-card);
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon {
+  width: 16px;
+  height: 16px;
+}
+
+.inner {
+  width: 11px;
+  height: 11px;
+  border-radius: var(--radius-pill);
+  background-color: var(--color-accent);
+}
+
+.label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-muted);
+}
+
+.caption {
+  font-size: 0.6875rem;
+  color: var(--color-text-muted);
+}
+
+/* States */
+
+.complete .dot {
+  background-color: var(--color-success);
+  color: var(--color-surface-card);
+}
+.complete .label {
+  color: var(--color-text);
+}
+
+.current .dot {
+  border: 2px solid var(--color-accent);
+  box-shadow: var(--shadow-focus-accent);
+}
+.current .label {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.upcoming .dot {
+  border: 2px solid var(--color-border);
+}
+
+.cancelled .dot {
+  background-color: var(--color-error);
+  color: var(--color-surface-card);
+}
+.cancelled .label {
+  color: var(--color-error);
+  font-weight: 700;
+}
+
+@media (max-width: 540px) {
+  .dot {
+    width: 26px;
+    height: 26px;
+  }
+  .icon {
+    width: 14px;
+    height: 14px;
+  }
+  .label {
+    font-size: 0.6875rem;
+  }
+}

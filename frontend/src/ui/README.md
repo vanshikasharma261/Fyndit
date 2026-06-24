@@ -44,6 +44,7 @@ Importing from the barrel (`src/ui`) also loads the design tokens once.
 | `Pagination` | Page navigation | products, orders |
 | `FilterSidebar` | Price slider + attribute facet pills | products |
 | `AddressCard` | Saved address with actions | profile, checkout |
+| `Timeline` | Lifecycle stepper (complete / current / upcoming / cancelled) | order detail |
 
 ## Build
 
