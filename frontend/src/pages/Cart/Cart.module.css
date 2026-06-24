@@ -408,27 +408,7 @@
   cursor: not-allowed;
 }
 
-/* ----- Empty state ----- */
-.empty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: var(--space-6);
-  padding: var(--space-8) var(--space-6);
-}
-
-.emptyTitle {
-  margin: 0;
-  font-size: 1.6rem;
-  font-weight: 700;
-  color: var(--color-text);
-}
-
-.emptyArt {
-  width: 220px;
-  max-width: 60%;
-  height: auto;
-}
+/* Empty state now renders via the design-system `EmptyState` (see CartPage). */
 
 /* ----- Responsive ----- */
 @media (max-width: 900px) {

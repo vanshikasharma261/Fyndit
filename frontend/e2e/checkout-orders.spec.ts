@@ -1027,6 +1027,32 @@ test.describe("Order detail — rendering", () => {
       timeout: 10000,
     });
   });
+
+  // ---- Timeline assertions (Order Tracking Timeline feature) ----
+
+  test("renders the order status timeline (aria-label=Order progress)", async ({
+    page,
+  }) => {
+    await page.goto("/orders/order-uuid-1");
+    // Wait for the order number to confirm the page loaded
+    await expect(page.getByText("#A2224894")).toBeVisible({ timeout: 10000 });
+    // The Timeline renders an <ol> with aria-label="Order progress"
+    await expect(
+      page.locator('[aria-label="Order progress"]'),
+    ).toBeVisible({ timeout: 10000 });
+  });
+
+  test("timeline has at least one step marked aria-current=step for a PENDING order", async ({
+    page,
+  }) => {
+    await page.goto("/orders/order-uuid-1");
+    // Wait for the order to load (mockPlacedOrder has status=PENDING)
+    await expect(page.getByText("#A2224894")).toBeVisible({ timeout: 10000 });
+    // PENDING status → the Placed step is current → should have aria-current="step"
+    await expect(
+      page.locator('[aria-current="step"]'),
+    ).toBeVisible({ timeout: 10000 });
+  });
 });
 
 // ---- Checkout — responsive layout ----

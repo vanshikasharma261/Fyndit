@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowDown, Lock, Minus, Plus, Tag, Trash2 } from "lucide-react";
+import { ArrowDown, Lock, Minus, Plus, ShoppingCart, Tag, Trash2 } from "lucide-react";
 import { toast } from "react-toastify";
+import { Button, EmptyState } from "../../ui";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   fetchCart,
@@ -20,78 +21,20 @@ function toastError(rejected: unknown): void {
   toast.error(payload?.message ?? CartMessages.genericError);
 }
 
-/** Centered empty state (matches `empty_cart_ui.png`). */
+/** Centered empty state, built on the design-system `EmptyState` primitive. */
 function EmptyCart() {
+  const navigate = useNavigate();
   return (
-    <div className={styles.empty}>
-      <h1 className={styles.emptyTitle}>{CartMessages.empty}</h1>
-      <svg
-        className={styles.emptyArt}
-        viewBox="0 0 240 200"
-        role="img"
-        aria-label="An empty shopping cart"
-      >
-        {/* Sparkles */}
-        <g
-          stroke="var(--color-accent)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-        >
-          <path d="M44 60 v10 M39 65 h10" />
-          <path d="M206 92 v8 M202 96 h8" />
-          <path d="M150 26 v8 M146 30 h8" />
-        </g>
-
-        {/* Trolley */}
-        <g
-          fill="none"
-          stroke="var(--color-text-muted)"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          {/* handle */}
-          <path d="M26 56 H40 L52 74" />
-          {/* basket */}
-          <path d="M52 74 H188 L168 134 H86 Z" />
-          {/* legs to wheels */}
-          <path d="M86 134 L96 150 M168 134 L156 150" />
-        </g>
-
-        {/* basket grid (lighter) */}
-        <g
-          fill="none"
-          stroke="var(--color-border)"
-          strokeWidth="3"
-          strokeLinecap="round"
-        >
-          <path d="M64 102 H176" />
-          <path d="M92 74 L88 134 M124 74 L122 134 M156 74 L156 134" />
-        </g>
-
-        {/* wheels */}
-        <g fill="var(--color-text-muted)">
-          <circle cx="100" cy="160" r="9" />
-          <circle cx="152" cy="160" r="9" />
-        </g>
-
-        {/* X badge */}
-        <circle
-          cx="190"
-          cy="52"
-          r="20"
-          fill="var(--color-surface-card)"
-          stroke="var(--color-accent)"
-          strokeWidth="3"
-        />
-        <path
-          d="M182 44 l16 16 M198 44 l-16 16"
-          stroke="var(--color-accent)"
-          strokeWidth="3.5"
-          strokeLinecap="round"
-        />
-      </svg>
-    </div>
+    <EmptyState
+      art={<ShoppingCart size={64} strokeWidth={1.5} />}
+      title={CartMessages.empty}
+      description={CartMessages.emptyBody}
+      action={
+        <Button onClick={() => navigate("/product/All")}>
+          {CartMessages.emptyCta}
+        </Button>
+      }
+    />
   );
 }
 

@@ -182,11 +182,20 @@ describe("CartPage — empty cart state", () => {
     });
   });
 
-  it("renders the empty-cart SVG illustration", async () => {
+  it("renders the empty-cart supporting copy", async () => {
     renderEmptyCart();
     await waitFor(() => {
       expect(
-        screen.getByRole("img", { name: "An empty shopping cart" }),
+        screen.getByText("Browse the catalog and add items to get started."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("renders the 'Continue shopping' call-to-action", async () => {
+    renderEmptyCart();
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Continue shopping" }),
       ).toBeInTheDocument();
     });
   });

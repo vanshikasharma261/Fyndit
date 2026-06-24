@@ -237,3 +237,11 @@ Call `vi.clearAllMocks()` in `beforeEach` when `mockNavigate` is shared across t
 ## Playwright aria-label Attribute Selector for Card Grids [home-page]
 
 When a page renders a grid of `<button>` elements that cannot be distinguished by role alone, use a CSS attribute selector anchored to a substring of the aria-label to scope locators: `page.locator('button[aria-label*="shop mobile-phones"]')`. This avoids strict-mode locator conflicts and does not require `getByRole` when each button has a unique partial label. Pair with `.first()` when the first item in the section is sufficient for the navigation assertion.
+
+## RTL Text Collision Between StatusBadge and Timeline Step Labels [order-tracking-timeline]
+
+`OrderDetailPage` renders two elements that share text values: the `<StatusBadge>` in the header (e.g. "Delivered", "Cancelled") and the `<Timeline>` step labels (also "Delivered", "Cancelled"). RTL assertions must be scoped to avoid false matches. Scope StatusBadge assertions to the STATUS header cell via `screen.getByText("STATUS").closest("div")` and wrap with `within()`. Scope Timeline assertions to `screen.getByRole("list", { name: "Order progress" })` and use `within()`. Use `getAllByText` when the same string genuinely appears twice (e.g. the ORDER DATE header and the Timeline Placed step caption both show the formatted date — `getAllByText("01 Jun 2026")` asserts both instances exist).
+
+## Playwright Attribute Selector for ARIA Landmark Testing [order-tracking-timeline]
+
+For testing a specific WAI-ARIA landmark or semantic element that has a known `aria-label`, use a CSS attribute selector via `page.locator('[aria-label="Order progress"]')` rather than `page.getByRole("list", { name: "Order progress" })`. Both work in Playwright but the attribute selector is more explicit about targeting the rendered HTML attribute and is less sensitive to role resolution. For `aria-current` step assertions use `page.locator('[aria-current="step"]')`.

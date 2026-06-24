@@ -1,0 +1,16 @@
+{
+  "projectId": "b3bd2271-d97f-487e-ba6d-d74ab36b9927",
+  "shape": "package",
+  "pkg": "frontend",
+  "globalName": "FynditUI",
+  "srcDir": "src/ui",
+  "cssEntry": "dist-ui/style.css",
+  "tsconfig": "tsconfig.json",
+  "buildCmd": "npm --prefix frontend run build:ui",
+  "readmeHeader": ".design-sync/conventions.md",
+  "overrides": {
+    "AddressCard": { "cardMode": "column" },
+    "Pagination": { "cardMode": "column" },
+    "TextField": { "cardMode": "column" }
+  }
+}

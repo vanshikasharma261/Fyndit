@@ -7,6 +7,18 @@ export const ProductMessages = {
   networkError: "Unable to reach the server. Please check your connection.",
   genericError: "Something went wrong. Please try again.",
   emptyResults: "No products found",
+  emptyResultsBody:
+    "We couldn't find any products that match. Try different keywords, or clear your filters to see everything in the store.",
+  /** Prefix for the "Searched for …" context pill (term rendered after it). */
+  searchedFor: "Searched for",
+  /** Empty-results call-to-action that clears the search/filters. */
+  browseAll: "Browse all products",
+  /** Optional pointers shown under the call-to-action when tips are enabled. */
+  searchTips: [
+    "Check the spelling of your search terms.",
+    "Try more general or fewer keywords.",
+    "Remove one or more active filters.",
+  ],
   detailNotFound: "This product is no longer available.",
   loading: "Loading…",
   clearFilters: "Clear filters",
@@ -19,6 +31,10 @@ export const CartMessages = {
   priceDetails: "PRICE DETAILS",
   /** Empty-cart heading (matches `empty_cart_ui.png`). */
   empty: "Your Cart is empty",
+  /** Empty-cart supporting line. */
+  emptyBody: "Browse the catalog and add items to get started.",
+  /** Empty-cart call-to-action label. */
+  emptyCta: "Continue shopping",
   /** Shown while the cart is loading. */
   loading: "Loading…",
   /** Brief confirmation after a successful add-to-cart. */
@@ -168,6 +184,7 @@ export const OrderMessages = {
   orderId: "ORDER ID",
   paymentMethod: "PAYMENT METHOD",
   status: "STATUS",
+  orderStatus: "Order status",
   qty: "Qty:",
   subtotal: "Subtotal",
   discount: "Discount",

@@ -8,6 +8,7 @@ import { resolveImageUrl } from "../../utils/image";
 import { formatMoney, formatOrderDate } from "../../utils/format";
 import { OrderMessages } from "../../constants/messages.constant";
 import type { OrderErrorResponse } from "../../types/order.types";
+import { StatusBadge } from "../../ui";
 import styles from "./Orders.module.css";
 
 function toastError(rejected: unknown): void {
@@ -109,11 +110,7 @@ function OrdersPage() {
                     {formatMoney(order.total_amount)}
                   </td>
                   <td>
-                    <span
-                      className={`${styles.statusPill} ${styles[`status_${order.status}`] ?? ""}`}
-                    >
-                      {order.status}
-                    </span>
+                    <StatusBadge status={order.status} />
                   </td>
                   <td>
                     <div className={styles.attributes}>

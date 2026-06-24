@@ -11,6 +11,8 @@ import { resolveImageUrl } from "../../utils/image";
 import { formatMoney, formatOrderDate } from "../../utils/format";
 import { OrderMessages } from "../../constants/messages.constant";
 import type { OrderErrorResponse } from "../../types/order.types";
+import { StatusBadge, Timeline } from "../../ui";
+import { buildOrderTimeline } from "./orderTimeline";
 import styles from "./Orders.module.css";
 
 function toastError(rejected: unknown): void {
@@ -90,12 +92,17 @@ function OrderDetailPage() {
         </div>
         <div className={styles.headerCell}>
           <span className={styles.headerLabel}>{OrderMessages.status}</span>
-          <span
-            className={`${styles.statusPill} ${styles[`status_${detail.status}`] ?? ""}`}
-          >
-            {detail.status}
-          </span>
+          <StatusBadge status={detail.status} />
         </div>
+      </div>
+
+      {/* Status timeline */}
+      <div className={styles.timelineCard}>
+        <span className={styles.timelineLabel}>{OrderMessages.orderStatus}</span>
+        <Timeline
+          steps={buildOrderTimeline(detail.status, detail.created_at)}
+          ariaLabel="Order progress"
+        />
       </div>
 
       {/* Items */}

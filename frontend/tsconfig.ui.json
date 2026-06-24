@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "composite": false,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.ui.tsbuildinfo",
+    "noEmit": false,
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist-ui",
+    "rootDir": "src/ui"
+  },
+  "include": ["src/ui"],
+  "exclude": ["src/ui/**/*.test.ts", "src/ui/**/*.test.tsx"]
+}
