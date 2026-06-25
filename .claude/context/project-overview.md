@@ -245,15 +245,19 @@ Address Types:
 
 ## J. Email System
 
-Order placement triggers:
+Order placement (both COD and Stripe) triggers a fire-and-forget email:
 
-- Invoice Generation
-- PDF Creation
-- Email Delivery
+- **HTML email** rendered from `order-confirmation.hbs` (Handlebars template)
+- **PDF invoice** generated from `invoice.hbs` via Puppeteer (headless Chromium
+  → A4 PDF), attached to the email
+- Delivered via Nodemailer SMTP (`SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`,
+  `MAIL_FROM` env vars)
 
-Emails are sent using SMTP.
+PDFs are stored permanently in `backend/assets/invoices/` and are NOT publicly
+accessible (Express middleware blocks the path).
 
-Email failures must never rollback successful orders.
+Email failures are logged and silently discarded — they never block or roll back
+an order.
 
 ---
 
@@ -294,6 +298,8 @@ Core Entities:
 - Passport
 - Stripe
 - Nodemailer
+- Puppeteer (PDF generation)
+- Handlebars (email + invoice templates)
 
 ---
 

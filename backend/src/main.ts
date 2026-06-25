@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import type { Request, Response } from 'express';
 import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { validationExceptionFactory } from './common/validation/validation-exception.factory';
@@ -14,6 +15,13 @@ async function bootstrap() {
     rawBody: true,
   });
   const config = app.get(ConfigService);
+
+  // Invoice PDFs are internal documents — block the path before registering the
+  // static asset handler so Express never reaches the file. useStaticAssets is
+  // registered right after and the guard intercepts the path first.
+  app.use('/assets/invoices', (_req: Request, res: Response) => {
+    res.status(403).json({ message: 'Forbidden' });
+  });
 
   // Serve downloaded product images. The seeder stores relative paths like
   // `/assets/products/<slug>/<color>/1.jpg`; the physical files live under

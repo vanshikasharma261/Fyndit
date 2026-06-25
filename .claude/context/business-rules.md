@@ -305,13 +305,38 @@ Mechanics (card flow):
 
 # Email Rules
 
-Successful order placement triggers:
+Successful order placement (both COD and Stripe) triggers:
 
-- Invoice generation
-- PDF generation
-- Email delivery
+- HTML order-confirmation email with an attached PDF invoice
+- PDF generated from `invoice.hbs` via Puppeteer (headless Chromium)
+- Email body rendered from `order-confirmation.hbs` via Handlebars
+- Sent to the order's user email via Nodemailer SMTP
 
-Email failures must not rollback orders.
+## Error Handling
+
+- Email is **fire-and-forget**: failures are logged and silently swallowed — they
+  never block or roll back a successful order.
+- A missing / invalid recipient email is detected early (`isEmail()` guard) and
+  logged — no PDF is generated and no email is attempted.
+
+## Invoice Storage
+
+- Generated PDFs are written to `backend/assets/invoices/invoice_{orderId}.pdf`
+  and kept permanently (never deleted).
+- The `/assets/invoices/` path is blocked from public HTTP access by an Express
+  middleware guard registered before `useStaticAssets`.
+
+## Invoice Numbering
+
+- Invoice number format: `INV-{orderNumber without #}`.
+  Example: order `#A2224894` → invoice `INV-A2224894`.
+- Derived from `order_number`, not from `order_id`, so both identifiers stay in sync.
+
+## Money Comparisons in Templates
+
+- Shipping/coupon fields from `OrderDetail` are already serialized as `"0.00"`
+  strings by `Prisma Decimal.toFixed(2)`. Compare with string equality (`=== '0.00'`),
+  never `parseFloat`, to decide "free shipping" / "has discount" template flags.
 
 ---
 
