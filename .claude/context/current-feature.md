@@ -1,14 +1,46 @@
 ## Current Feature
 
-**Order Tracking Timeline** (spec: `011-order-tracking-timeline.md`)
+**Email Notification on Order Placement** (spec: `specs/012-email-notification.md`)
 
-Branch: `feature/order-tracking-timeline` (cut from `feat/ui-design-system`, which carries the design-system foundation this feature exercises — not from `main`, so the new `design-system.md` / workflow context travels with it).
+Branch: `feature/email-notification` (cut from `main`)
 
-Add a visual order-status timeline to the order detail screen, built as a new **reusable `@/ui` `Timeline` primitive** and published back to the Fyndit Design System. **Frontend-only** — derived from the order's existing single `status` field (no backend, migration, or new endpoint). This is the **first feature to run the new design→code workflow**: the timeline was prototyped and approved in claude.ai/design (Phase 2) before implementation.
+Send a professional transactional email with a PDF invoice attachment to the user's registered email address whenever a new order is placed (both COD and Stripe). **Backend-only** — no UI changes. Design phase skipped.
 
 ## Status
 
-**Done** — All 8 phases complete (spec → design → implement → test → review → self-improve → finalize). Lint/build/build:ui clean; 499 unit/RTL tests + 40 Playwright e2e tests passing.
+**Done** — All 8 phases complete.
+
+## Goal
+
+After a successful order placement, generate a Puppeteer-rendered PDF invoice (saved to `backend/assets/invoices/invoice_{orderId}.pdf`) and email it to the user via nodemailer SMTP. The email body and the invoice are both rendered from Handlebars (hbs) templates. Email failure is fire-and-forget — never blocks the order response.
+
+## Scope / Plan
+
+### Confirmed decisions (Phase-1 Q&A)
+
+1. **Puppeteer** (full install, downloads Chromium) for PDF rendering — as specified in the raw spec.
+2. **Fire-and-forget** email failure: errors are caught + logged, order placement always succeeds.
+3. **Keep PDFs permanently** in `backend/assets/invoices/` (audit / re-send).
+4. **Non-global module** — `OrderModule` imports `MailModule` directly.
+
+### Plan (Phase 4)
+
+- Install `puppeteer`, `nodemailer`, `hbs`, `@types/nodemailer` in `backend/`.
+- Create `backend/src/mail/` module:
+  - `mail.module.ts` — exports `MailService`
+  - `mail.service.ts` — `generateInvoice()` + `sendOrderConfirmation()`
+  - `templates/order-confirmation.hbs` — branded HTML email body
+  - `templates/invoice.hbs` — invoice HTML rendered to PDF
+- Ensure `backend/assets/invoices/` directory exists at service init.
+- Wire into `OrderModule` (import `MailModule`) and inject `MailService` into `OrderService`.
+- Call `sendOrderConfirmation()` after `placeCodOrder()` and `placeStripeOrder()` — wrapped in try/catch.
+
+### No new `.env` keys — uses existing:
+`MAIL_FROM`, `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`
+
+---
+
+## Prior Feature — Order Tracking Timeline (spec: `011-order-tracking-timeline.md`) — Done
 
 ## Goal
 
@@ -192,6 +224,16 @@ Full cart experience: a backend `cart` module (view / add / update-qty / remove)
    - **Review (Phase 5) fixes applied (user-approved):** added the `order_coupon_ref` migration + coupon release on cancel (`CouponService.releaseUsage`, called in `restockAndCancel`); **narrowed the `placeStripeOrder` catch** to refund only on `BadRequestException` (a duplicate `P2002`/serialization `P2034` no longer erroneously refunds a placed order — re-thrown so Stripe retries); UUID-validate webhook metadata; `@HttpCode(200)` on cancel; de-duped the double `assertActiveUser` in coupon apply/remove (`composeSummary`); FE: `creatingIntent` flag (guards double-tap PaymentIntents), Stripe `processing` status handled, stable `order_item_id` keys, attribute spacing, coupon Enter-to-apply + aria-label, hardcoded colors → new `--color-overlay-dark`/`--color-primary-light-subtle` tokens, `<th scope>`, radio `value` attrs, narrow-screen table treatment, focus-visible states.
    - **Self-improvement (Phase 6):** refined `prisma-schema.md` + `database-design.md` (Order↔Coupon), `business-rules.md` (coupon lifecycle + shipping fee + Stripe webhook placement + cancellation mechanics), `development-rules.md` (module graph + Stripe webhook rules), `testing-patterns.md` (4 new patterns: webhook rawBody/Content-Type, `$transaction` callback-vs-array mocks, Playwright route globs + exact-text), and corrected the 009 spec's migration note.
    - **Deferred (out of scope / follow-ups from review):** invoice email + PDF; `@@unique([stripe_payment_id])` migration (DB-level idempotency, currently app-guarded); `@@index([user_id, created_at])` for order history; single-query order detail; cross-cutting debt (`ApiResult<T>` now 5×, `assertActiveUser` 6×, `pickPrimaryImage`/`asAttributeRecord` 4×) — extraction recommended in a dedicated cleanup pass.
+
+13. **Email Notification on Order Placement** — *Done* (spec `012-email-notification.md`). Branch `feature/email-notification` (cut from `main`). **Backend-only** — no UI changes. Design phase skipped. Sends a professional transactional HTML email with a Puppeteer-generated PDF invoice attached after every successful COD or Stripe order.
+   - **New `backend/src/mail/` module** (`mail.module.ts`, `mail.service.ts`, `templates/invoice.hbs`, `templates/order-confirmation.hbs`). `MailService` implements `OnModuleInit`/`OnModuleDestroy` — Puppeteer browser launched once at startup (singleton), closed on app teardown. Handlebars templates compiled once in the constructor and cached in a `Map`. `sendOrderConfirmation` validates the recipient email with `isEmail()` before touching Puppeteer or SMTP, then generates the PDF, renders the email body, and sends via Nodemailer SMTP.
+   - **`order.service.ts`** — fire-and-forget chain after both `placeCodOrder` and `placeStripeOrder`: `Promise.all([buildOrderDetail(orderId), fetchUserBasic(userId)]).then(([order, user]) => this.mailService.sendOrderConfirmation(order, user)).catch((err) => this.logger.error(...))`. Single outer `.catch()` is the only error boundary — never blocks the order response.
+   - **`main.ts`** — Express middleware blocking `/assets/invoices` registered **before** `useStaticAssets` so the block intercepts first; invoice PDFs are never publicly accessible.
+   - **Confirmed decisions (Phase-1 Q&A):** Puppeteer (full install, downloads Chromium); fire-and-forget (failures logged, never block order); PDFs kept permanently in `backend/assets/invoices/`; `MailModule` imported by `OrderModule` (non-global).
+   - **Phase 6 review fixes applied (15 findings):** H1 — `fetchUserBasic` throws when user not found (was returning `null`); H2 — `sendOrderConfirmation` has no internal try/catch, throws on failure, single outer `.catch` in `OrderService`; H3 — templates compiled once in constructor (not per-send); H4 — Puppeteer browser singleton via `OnModuleInit`/`OnModuleDestroy` (not per-email); M1 — money fields compared with `!== '0.00'` string equality (not `parseFloat`); M2 — invoice number `INV-${order_number.replace('#', '')}` derived from `order_number`, not `order_id`; M3 — `isEmail()` guard before any I/O; M4 — invoice path blocked in `main.ts` before `useStaticAssets`; M5/M6 — table-based email + invoice HTML (no flex/grid); L1–L4 — email template visual polish (unicode checkmark, status badge, totals, copyright); L5 — `SMTP_PORT` via `getOrThrow` + `Number()`; L6 — `ConfigModule` imported in `MailModule`; C1 — `.env` committed pre-feature (noted for manual history scrub + credential rotation).
+   - **Tests:** `mail.service.spec.ts` fully rewritten for singleton architecture (lifecycle hooks in `beforeEach`/`afterEach`, `jest.mock()` factory callbacks with explicit return types to satisfy `no-unsafe-return`); `order.service.spec.ts` updated with fire-and-forget patterns (microtask draining via `setImmediate`). **318 backend unit tests passing; lint 0 errors; build clean.**
+   - **Self-improvement (Phase 7):** `development-rules.md` — fire-and-forget pattern section, `OnModuleInit`/`OnModuleDestroy` section, clarified "never throw raw Error" to exempt fire-and-forget services; `testing-patterns.md` — lifecycle hook testing, `jest.mock()` factory return types, `resetAllMocks` full-restoration rule; `business-rules.md` — full Email Rules section (error handling, invoice storage, numbering, money comparisons); `project-overview.md` — Section J rewritten, Puppeteer + Handlebars added to tech stack.
+   - **Deferred:** SMTP credentials in `.env` should be rotated if the file was ever pushed (pre-existing C1 finding); Puppeteer download (~170 MB Chromium) on first `npm install` may need a CI layer cache; `@@unique([stripe_payment_id])` DB-level idempotency from spec 009 still pending.
 
 12. **Home Page — Banner + Product Sections** — *Done* (spec `010-home-page.md`). Branch `feature/home-page` (cut from `main`). **Frontend-only** — replaces the placeholder `pages/Home/HomePage.tsx` with the full post-login landing page matching `homepage_lower_section_ui.png`: a full-width banner above five themed product-card rows.
    - **Implementation:** `HomePage.tsx` + `Home.module.css` rewritten. Banner renders the bundled `assets/hero_section.png` (imported via Vite, `fetchPriority="high"` as the LCP element) with two **transparent overlay `<button>` hotspots** percentage-positioned over the artwork's baked-in "Start Finding Now" / "Browse Categories" buttons — both `navigate('/product/All')`. Below it, five sections (Popular Picks, Wear Your Favourite Team, Style in Motion, Mobiles, Laptops) driven by a typed in-file `HOME_SECTIONS: HomeSection[]` (no repeated JSX); each card is a focusable `<button><img></button>` that navigates to its category. Responsive grid 5→4→2 cols; CSS Modules + theme tokens only; semantic `<h2>` section headings; `loading="lazy"` + `onError` (hide broken-image glyph) on card images. **No new dependencies, no backend/Redux/schema.**

@@ -30,6 +30,7 @@ import {
   OrderListResponse,
 } from './types/order.types';
 import type { PaymentIntentMetadata } from '../payment/stripe.service';
+import { MailService } from '../mail/mail.service';
 
 /** Statuses from which the user may still cancel (before the order ships). */
 const CANCELLABLE_STATUSES: readonly OrderStatus[] = [
@@ -129,6 +130,7 @@ export class OrderService {
     private readonly checkoutService: CheckoutService,
     private readonly couponService: CouponService,
     private readonly stripe: StripeService,
+    private readonly mailService: MailService,
   ) {}
 
   /**
@@ -161,7 +163,18 @@ export class OrderService {
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
 
-    return this.buildOrderDetail(this.prisma, userId, orderId);
+    const order = await this.buildOrderDetail(this.prisma, userId, orderId);
+
+    // Fire-and-forget: email failure must never surface to the caller.
+    this.fetchUserBasic(userId)
+      .then((user) => this.mailService.sendOrderConfirmation(order, user))
+      .catch((err) =>
+        this.logger.error(
+          `Email dispatch failed for COD order ${orderId}: ${String(err)}`,
+        ),
+      );
+
+    return order;
   }
 
   /** Paginated order history (newest first), with a representative item each. */
@@ -288,14 +301,14 @@ export class OrderService {
     }
 
     try {
-      await this.prisma.$transaction(
+      const newOrderId = await this.prisma.$transaction(
         async (tx) => {
           await this.checkoutService.assertOwnedAddress(
             tx,
             metadata.user_id,
             metadata.address_id,
           );
-          await this.placeOrderTx(
+          return this.placeOrderTx(
             tx,
             metadata.user_id,
             metadata.address_id,
@@ -309,6 +322,20 @@ export class OrderService {
       this.logger.log(
         `placeStripeOrder placed order for ${paymentIntentId} (user ${metadata.user_id})`,
       );
+
+      // Fire-and-forget: email failure must never surface to the webhook.
+      Promise.all([
+        this.buildOrderDetail(this.prisma, metadata.user_id, newOrderId),
+        this.fetchUserBasic(metadata.user_id),
+      ])
+        .then(([order, user]) =>
+          this.mailService.sendOrderConfirmation(order, user),
+        )
+        .catch((err) =>
+          this.logger.error(
+            `Email dispatch failed for stripe order ${paymentIntentId}: ${String(err)}`,
+          ),
+        );
     } catch (error) {
       // Only refund when the order is genuinely unfulfillable (out of stock /
       // empty cart / address gone) — a BadRequestException from buildOrderContext
@@ -479,6 +506,24 @@ export class OrderService {
   }
 
   // ----- Read helpers -----
+
+  private async fetchUserBasic(
+    userId: string,
+  ): Promise<{ name: string; email: string }> {
+    const user = await this.prisma.user.findUnique({
+      where: { user_id: userId },
+      select: { first_name: true, last_name: true, email: true },
+    });
+    if (!user) {
+      throw new Error(
+        `User ${userId} not found — cannot send order confirmation email`,
+      );
+    }
+    return {
+      name: `${user.first_name} ${user.last_name}`.trim(),
+      email: user.email,
+    };
+  }
 
   private async assertActiveUser(userId: string): Promise<void> {
     const active = await this.authService.isUserActive(userId);

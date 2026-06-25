@@ -52,6 +52,56 @@ Services should contain:
 
 ---
 
+## Fire-and-Forget Pattern for Side Effects [order-module, mail-module]
+
+When a service triggers a non-critical side effect (e.g. confirmation email) that
+must never block the primary response, use a Promise chain — do NOT `await` it:
+
+```ts
+this.helperA()
+  .then((result) => this.helperB(result))
+  .catch((err) => this.logger.error(`Side effect failed: ${String(err)}`));
+return primaryResult;   // returned immediately — not after the chain settles
+```
+
+Rules:
+- The outer `.catch()` is the single error boundary — it logs and swallows.
+- The side-effect service (`MailService`) must NOT have its own internal try/catch;
+  it should throw on failure so the single outer `.catch()` handles it.
+- Fire-and-forget is only appropriate for side effects that have no business
+  consequence on failure (email, analytics). Never use it for inventory, payments,
+  or any operation the user depends on.
+
+---
+
+## OnModuleInit / OnModuleDestroy for Long-Lived Resources [mail-module]
+
+Use `OnModuleInit` to launch singleton resources (Puppeteer browser, connection
+pools) and `OnModuleDestroy` to release them. Per-request instantiation (e.g.
+spawning Chromium per email) is resource exhaustion. Pre-compile templates or
+expensive artifacts in the constructor and cache them in a `Map`.
+
+Pattern:
+```ts
+@Injectable()
+export class MailService implements OnModuleInit, OnModuleDestroy {
+  private readonly templates = new Map<string, CompiledFn>();
+  private browser: Browser | null = null;
+
+  constructor(...) {
+    // Disk I/O, CPU-expensive setup — once at startup.
+    for (const name of TEMPLATE_NAMES) {
+      this.templates.set(name, Handlebars.compile(fs.readFileSync(...)));
+    }
+  }
+
+  async onModuleInit() { this.browser = await puppeteer.launch(...); }
+  async onModuleDestroy() { await this.browser?.close(); }
+}
+```
+
+---
+
 # DTO Rules
 
 All request bodies must use DTOs.
@@ -145,7 +195,13 @@ Use NestJS exceptions:
 - ConflictException
 - InternalServerErrorException
 
-Never throw raw Error objects.
+Never throw raw Error objects from services in the HTTP request path — they surface
+as unhandled 500s. Use NestJS exceptions so the global exception filter serializes
+them correctly.
+
+Side-effect services consumed fire-and-forget (e.g. `MailService`) are the
+exception: their errors are caught by the outer `.catch()` in the caller and logged,
+never reaching the HTTP layer, so plain `throw new Error(...)` is correct there.
 
 ---
 

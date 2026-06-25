@@ -118,6 +118,8 @@ Re-apply this implementation in `beforeEach` after `jest.clearAllMocks()` resets
 
 Fix: use `jest.resetAllMocks()` in the outer `beforeEach` instead of `clearAllMocks()`. `resetAllMocks()` also drains `Once` queues. Since it also removes any `mockImplementation()`, re-apply `mockPrisma.$transaction.mockImplementation(...)` immediately after — exactly the pattern already used in cart.service.spec.ts for `$transaction`. This distinction matters whenever multiple tests in a describe block use `mockResolvedValueOnce` on the same shared stub object and not all queued values are guaranteed to be consumed.
 
+**Extended rule from `mail-module`:** After `resetAllMocks()`, restore EVERY mock's default return value — not just the critical `$transaction` one. Any `jest.fn()` that had a `.mockResolvedValue()` / `.mockReturnValue()` set at declaration time is reset to returning `undefined`. A missing restoration causes silent "undefined is not a function" failures several tests later when the mock is finally called.
+
 ---
 
 ## Playwright /cart Mock Required in All Profile Page Tests [address-feature]
@@ -245,3 +247,52 @@ When a page renders a grid of `<button>` elements that cannot be distinguished b
 ## Playwright Attribute Selector for ARIA Landmark Testing [order-tracking-timeline]
 
 For testing a specific WAI-ARIA landmark or semantic element that has a known `aria-label`, use a CSS attribute selector via `page.locator('[aria-label="Order progress"]')` rather than `page.getByRole("list", { name: "Order progress" })`. Both work in Playwright but the attribute selector is more explicit about targeting the rendered HTML attribute and is less sensitive to role resolution. For `aria-current` step assertions use `page.locator('[aria-current="step"]')`.
+
+## ESM-Only Dependency Stub via moduleNameMapper [email-notification]
+
+`puppeteer` ships as a pure ESM package (`"type": "module"`) that the CommonJS Jest / ts-jest unit-test environment cannot parse. Add a CJS stub at `src/__mocks__/puppeteer.js` and wire it in the unit Jest config (`package.json` `moduleNameMapper`) as `"^puppeteer$": "<rootDir>/__mocks__/puppeteer.js"`. For the e2e config (`test/jest-e2e.json`) the rootDir is `test/`, so use `"<rootDir>/../src/__mocks__/puppeteer.js"`. Tests that need full control of puppeteer (e.g. `mail.service.spec.ts`) layer a `jest.mock('puppeteer', factory)` on top — Jest's factory mock overrides the mapper stub. Tests that only mock the service consuming puppeteer (e.g. `order.service.spec.ts`) just use `jest.mock('../mail/mail.service')` and the mapper ensures the transitive `puppeteer` import never reaches the CJS parser.
+
+## Fire-and-Forget Microtask Draining in Unit Tests [email-notification]
+
+When a service method launches a fire-and-forget promise chain (no `await`, no returned promise), a single `await Promise.resolve()` is enough to flush a single-level chain (e.g. `fetchUserBasic().then(sendMail)`). For a deeper chain — e.g. `Promise.all([buildOrderDetail(), fetchUser()]).then(sendMail)` — where `buildOrderDetail` itself makes two sequential async calls, use `await new Promise<void>((resolve) => setImmediate(resolve))` to drain the entire microtask queue in one step. `setImmediate` fires after all pending microtasks and I/O events, guaranteeing the chain has settled before the assertion runs.
+
+## Mocking ESM Services with jest.mock + MailService Module-Level Hoist [email-notification]
+
+When a service (`OrderService`) depends on another service (`MailService`) that transitively imports an ESM-only package (`puppeteer`), add `jest.mock('../mail/mail.service')` as the **very first statement** in the spec (before any import). Jest hoists `jest.mock` calls, preventing `mail.service.ts` from being compiled by the CJS ts-jest transformer. In the `Test.createTestingModule` providers, supply the mock via `{ provide: MailService, useValue: mockMailService }` where `mockMailService` has `sendOrderConfirmation: jest.fn().mockResolvedValue(undefined)`. Re-apply `.mockResolvedValue(undefined)` after `jest.resetAllMocks()` in `beforeEach` since `resetAllMocks` drains the resolved-value queue.
+
+## Testing OnModuleInit / OnModuleDestroy Lifecycle Hooks [mail-module]
+
+NestJS lifecycle hooks (`OnModuleInit`, `OnModuleDestroy`) are NOT called automatically by `Test.createTestingModule().compile()`. Call them explicitly in `beforeEach` / `afterEach`:
+
+```ts
+beforeEach(async () => {
+  // ... compile module, get service
+  await service.onModuleInit();   // launches the singleton browser / opens connection
+});
+
+afterEach(async () => {
+  await service.onModuleDestroy(); // closes browser / releases connection
+});
+```
+
+To test the "resource not initialized" error path, create a fresh service without calling `onModuleInit()` inline in that specific test. Verify `onModuleDestroy` calls the expected close/cleanup mock (e.g. `mockBrowserClose`).
+
+## jest.mock() Factory Callback Return Types [mail-module]
+
+When `@typescript-eslint/no-unsafe-return` is active (via `recommendedTypeChecked`), arrow functions inside `jest.mock()` factories that call `jest.fn()` mocks trigger the rule because `jest.fn()` returns `any`. Fix: add an explicit return type and cast the result:
+
+```ts
+jest.mock('puppeteer', () => ({
+  __esModule: true,
+  default: {
+    launch: (...args: unknown[]): typeof mockBrowser =>
+      mockLaunch(...args) as typeof mockBrowser,
+  },
+  launch: (...args: unknown[]): typeof mockBrowser =>
+    mockLaunch(...args) as typeof mockBrowser,
+}));
+// void functions (e.g. fs.mkdirSync): (...args: unknown[]): void => { mockFn(...args); }
+// string returns (e.g. fs.readFileSync):  (...args: unknown[]): string => mockFn(...args) as string
+```
+
+The `typeof mockX` pattern keeps the return type in sync with the mock object's inferred type automatically.

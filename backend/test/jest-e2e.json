@@ -19,6 +19,7 @@
     }]
   },
   "moduleNameMapper": {
-    "^(\\.\\.?/.*)\\.js$": "$1"
+    "^(\\.\\.?/.*)\\.js$": "$1",
+    "^puppeteer$": "<rootDir>/../src/__mocks__/puppeteer.js"
   }
 }

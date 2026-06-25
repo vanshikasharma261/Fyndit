@@ -5,13 +5,26 @@
  * cancelOrder COD-sync vs Stripe-refund branch, placeStripeOrder idempotency
  * + refund-on-stock-fail, finalizeRefund idempotency + restock.
  *
+ * New (email-notification feature): placeCodOrder and placeStripeOrder email
+ * dispatch — fire-and-forget verified via MailService mock assertions.
+ *
  * Uses jest.resetAllMocks() in beforeEach so Once-queue values don't leak
  * (per the address-module pattern in testing-patterns.md).
  *
  * $transaction has two forms here:
  *  1. Callback form (Serializable): mock invokes callback with mockTx.
  *  2. Array form (list count+findMany): mock resolves the array.
+ *
+ * MailService is module-mocked so mail.service.ts (and its ESM `puppeteer`
+ * dependency) never gets loaded in the CommonJS Jest environment.
  */
+
+// ---------------------------------------------------------------------------
+// Module-level mock for MailService — must precede all imports that
+// transitively import puppeteer (an ESM-only package).
+// ---------------------------------------------------------------------------
+jest.mock('../mail/mail.service');
+
 import { Test, TestingModule } from '@nestjs/testing';
 import {
   BadRequestException,
@@ -25,6 +38,7 @@ import { AuthService } from '../auth/auth.service';
 import { CheckoutService } from '../checkout/checkout.service';
 import { CouponService } from '../checkout/coupon.service';
 import { StripeService } from '../payment/stripe.service';
+import { MailService } from '../mail/mail.service';
 import { AuthMessages, OrderMessages } from '../constants/messages.constant';
 import {
   OrderStatus,
@@ -88,6 +102,9 @@ const mockPrisma = {
   payment: {
     findFirst: jest.fn(),
   },
+  user: {
+    findUnique: jest.fn(),
+  },
   $transaction: jest.fn(),
 };
 
@@ -107,6 +124,10 @@ const mockCouponService = {
 
 const mockStripeService = {
   refundPaymentIntent: jest.fn(),
+};
+
+const mockMailService = {
+  sendOrderConfirmation: jest.fn(),
 };
 
 // ---------------------------------------------------------------------------
@@ -170,6 +191,7 @@ function makeOrderDetailRow() {
     },
     items: [
       {
+        order_item_id: 'item-001',
         product_name: 'Shirt',
         purchase_price: d(500),
         quantity: 2,
@@ -246,6 +268,29 @@ function setArrayTransaction(results: unknown[]) {
 }
 
 // ---------------------------------------------------------------------------
+// COD order setup helper — shared by placeCodOrder tests
+// ---------------------------------------------------------------------------
+
+function setupCodOrderMocks() {
+  mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
+  mockCheckoutService.buildOrderContext.mockResolvedValue(makeOrderContext());
+  mockTx.order.create.mockResolvedValue({ order_id: ORDER_ID });
+  mockTx.productVariant.update.mockResolvedValue({});
+  mockTx.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
+  mockTx.cartItem.deleteMany.mockResolvedValue({ count: 1 });
+  mockTx.cart.update.mockResolvedValue({});
+  mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
+  mockPrisma.user.findUnique.mockResolvedValue({
+    first_name: 'Jane',
+    last_name: 'Doe',
+    email: 'jane@example.com',
+  });
+  (mockPrisma as unknown as Record<string, unknown>)['address'] = {
+    findFirst: jest.fn().mockResolvedValue(makeAddress()),
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Test suite
 // ---------------------------------------------------------------------------
 
@@ -258,6 +303,9 @@ describe('OrderService', () => {
     // Default: callback transaction (can be overridden per test)
     setCallbackTransaction();
 
+    // Restore default resolved value for mockMailService after resetAllMocks.
+    mockMailService.sendOrderConfirmation.mockResolvedValue(undefined);
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         OrderService,
@@ -266,6 +314,7 @@ describe('OrderService', () => {
         { provide: CheckoutService, useValue: mockCheckoutService },
         { provide: CouponService, useValue: mockCouponService },
         { provide: StripeService, useValue: mockStripeService },
+        { provide: MailService, useValue: mockMailService },
       ],
     }).compile();
 
@@ -296,25 +345,7 @@ describe('OrderService', () => {
     });
 
     it('places a COD order and returns OrderDetail', async () => {
-      mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
-      mockCheckoutService.buildOrderContext.mockResolvedValue(
-        makeOrderContext(),
-      );
-      mockTx.order.create.mockResolvedValue({ order_id: ORDER_ID });
-      mockTx.productVariant.update.mockResolvedValue({});
-      mockTx.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
-      mockTx.cartItem.deleteMany.mockResolvedValue({ count: 1 });
-      mockTx.cart.update.mockResolvedValue({});
-
-      // buildOrderDetail calls
-      mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
-      mockPrisma.order.findMany = jest.fn(); // unused here
-      // address lookup in buildOrderDetail
-      const prismaAddressMock = {
-        findFirst: jest.fn().mockResolvedValue(makeAddress()),
-      };
-      (mockPrisma as unknown as Record<string, unknown>)['address'] =
-        prismaAddressMock;
+      setupCodOrderMocks();
 
       const result = await service.placeCodOrder(USER_ID, {
         address_id: ADDRESS_ID,
@@ -327,19 +358,7 @@ describe('OrderService', () => {
     });
 
     it('wraps placement in a $transaction', async () => {
-      mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
-      mockCheckoutService.buildOrderContext.mockResolvedValue(
-        makeOrderContext(),
-      );
-      mockTx.order.create.mockResolvedValue({ order_id: ORDER_ID });
-      mockTx.productVariant.update.mockResolvedValue({});
-      mockTx.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
-      mockTx.cartItem.deleteMany.mockResolvedValue({ count: 1 });
-      mockTx.cart.update.mockResolvedValue({});
-      mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
-      (mockPrisma as unknown as Record<string, unknown>)['address'] = {
-        findFirst: jest.fn().mockResolvedValue(makeAddress()),
-      };
+      setupCodOrderMocks();
 
       await service.placeCodOrder(USER_ID, { address_id: ADDRESS_ID });
 
@@ -347,19 +366,7 @@ describe('OrderService', () => {
     });
 
     it('decrements stock for each order line inside the transaction', async () => {
-      mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
-      mockCheckoutService.buildOrderContext.mockResolvedValue(
-        makeOrderContext(),
-      );
-      mockTx.order.create.mockResolvedValue({ order_id: ORDER_ID });
-      mockTx.productVariant.update.mockResolvedValue({});
-      mockTx.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
-      mockTx.cartItem.deleteMany.mockResolvedValue({ count: 1 });
-      mockTx.cart.update.mockResolvedValue({});
-      mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
-      (mockPrisma as unknown as Record<string, unknown>)['address'] = {
-        findFirst: jest.fn().mockResolvedValue(makeAddress()),
-      };
+      setupCodOrderMocks();
 
       await service.placeCodOrder(USER_ID, { address_id: ADDRESS_ID });
 
@@ -383,6 +390,11 @@ describe('OrderService', () => {
       mockTx.cart.update.mockResolvedValue({});
       mockCouponService.recordUsage.mockResolvedValue(undefined);
       mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
+      mockPrisma.user.findUnique.mockResolvedValue({
+        first_name: 'Jane',
+        last_name: 'Doe',
+        email: 'jane@example.com',
+      });
       (mockPrisma as unknown as Record<string, unknown>)['address'] = {
         findFirst: jest.fn().mockResolvedValue(makeAddress()),
       };
@@ -397,19 +409,7 @@ describe('OrderService', () => {
     });
 
     it('clears the cart after creating the order', async () => {
-      mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
-      mockCheckoutService.buildOrderContext.mockResolvedValue(
-        makeOrderContext(),
-      );
-      mockTx.order.create.mockResolvedValue({ order_id: ORDER_ID });
-      mockTx.productVariant.update.mockResolvedValue({});
-      mockTx.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
-      mockTx.cartItem.deleteMany.mockResolvedValue({ count: 1 });
-      mockTx.cart.update.mockResolvedValue({});
-      mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
-      (mockPrisma as unknown as Record<string, unknown>)['address'] = {
-        findFirst: jest.fn().mockResolvedValue(makeAddress()),
-      };
+      setupCodOrderMocks();
 
       await service.placeCodOrder(USER_ID, { address_id: ADDRESS_ID });
 
@@ -419,6 +419,56 @@ describe('OrderService', () => {
           data: containing({ applied_coupon: null }),
         }),
       );
+    });
+
+    // -----------------------------------------------------------------------
+    // Email notification tests [email-notification]
+    // -----------------------------------------------------------------------
+
+    it('calls mailService.sendOrderConfirmation after successful placement (fire-and-forget)', async () => {
+      setupCodOrderMocks();
+
+      await service.placeCodOrder(USER_ID, { address_id: ADDRESS_ID });
+
+      // Fire-and-forget: the call is made asynchronously. Give the micro-task
+      // queue a chance to settle by awaiting a resolved promise.
+      await Promise.resolve();
+
+      expect(mockMailService.sendOrderConfirmation).toHaveBeenCalledTimes(1);
+      expect(mockMailService.sendOrderConfirmation).toHaveBeenCalledWith(
+        containing({ order_id: ORDER_ID }),
+        containing({ email: 'jane@example.com' }),
+      );
+    });
+
+    it('returns the order response even when sendOrderConfirmation rejects (email failure does not throw)', async () => {
+      setupCodOrderMocks();
+      // Make email fail
+      mockMailService.sendOrderConfirmation.mockRejectedValueOnce(
+        new Error('SMTP down'),
+      );
+
+      const result = await service.placeCodOrder(USER_ID, {
+        address_id: ADDRESS_ID,
+      });
+
+      // The order must still be returned despite email failure.
+      expect(result.order_id).toBe(ORDER_ID);
+    });
+
+    it('returns the order response even when fetchUserBasic rejects (email failure does not throw)', async () => {
+      setupCodOrderMocks();
+      // Make user lookup fail (the promise chain that feeds sendOrderConfirmation)
+      mockPrisma.user.findUnique.mockRejectedValueOnce(
+        new Error('DB connection lost'),
+      );
+
+      const result = await service.placeCodOrder(USER_ID, {
+        address_id: ADDRESS_ID,
+      });
+
+      // The order must still be returned despite the user lookup failure.
+      expect(result.order_id).toBe(ORDER_ID);
     });
   });
 
@@ -839,7 +889,7 @@ describe('OrderService', () => {
   });
 
   // =========================================================================
-  // placeStripeOrder — idempotency + refund-on-stock-fail
+  // placeStripeOrder — idempotency + refund-on-stock-fail + email notification
   // =========================================================================
 
   describe('placeStripeOrder', () => {
@@ -918,6 +968,68 @@ describe('OrderService', () => {
       expect(mockStripeService.refundPaymentIntent).toHaveBeenCalledWith(
         STRIPE_INTENT_ID,
       );
+    });
+
+    // -----------------------------------------------------------------------
+    // Email notification tests [email-notification]
+    // -----------------------------------------------------------------------
+
+    it('calls mailService.sendOrderConfirmation after successful Stripe order placement', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
+      mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
+      mockCheckoutService.buildOrderContext.mockResolvedValue(
+        makeOrderContext(),
+      );
+      mockTx.order.create.mockResolvedValue({ order_id: ORDER_ID });
+      mockTx.productVariant.update.mockResolvedValue({});
+      mockTx.cart.findUnique.mockResolvedValue({ cart_id: CART_ID });
+      mockTx.cartItem.deleteMany.mockResolvedValue({ count: 1 });
+      mockTx.cart.update.mockResolvedValue({});
+      mockPrisma.order.findFirst.mockResolvedValue(makeOrderDetailRow());
+      mockPrisma.user.findUnique.mockResolvedValue({
+        first_name: 'Jane',
+        last_name: 'Doe',
+        email: 'jane@example.com',
+      });
+      (mockPrisma as unknown as Record<string, unknown>)['address'] = {
+        findFirst: jest.fn().mockResolvedValue(makeAddress()),
+      };
+
+      await service.placeStripeOrder(
+        { user_id: USER_ID, address_id: ADDRESS_ID, coupon_code: '' },
+        STRIPE_INTENT_ID,
+      );
+
+      // Allow the fire-and-forget Promise.all chain to settle.
+      // buildOrderDetail makes 2 async calls inside Promise.all, so we need to
+      // drain the full microtask queue (more than one tick).
+      await new Promise<void>((resolve) => setImmediate(resolve));
+
+      expect(mockMailService.sendOrderConfirmation).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call sendOrderConfirmation when the transaction fails (BadRequestException path)', async () => {
+      mockPrisma.payment.findFirst.mockResolvedValue(null);
+      mockPrisma.$transaction.mockImplementation(
+        async (callback: (tx: typeof mockTx) => Promise<unknown>) => {
+          await callback(mockTx);
+        },
+      );
+      mockCheckoutService.assertOwnedAddress.mockResolvedValue(undefined);
+      mockCheckoutService.buildOrderContext.mockRejectedValue(
+        new BadRequestException('insufficient stock'),
+      );
+      mockStripeService.refundPaymentIntent.mockResolvedValue({});
+
+      await service.placeStripeOrder(
+        { user_id: USER_ID, address_id: ADDRESS_ID, coupon_code: '' },
+        STRIPE_INTENT_ID,
+      );
+
+      // Allow any pending microtasks to settle
+      await Promise.resolve();
+
+      expect(mockMailService.sendOrderConfirmation).not.toHaveBeenCalled();
     });
   });
 

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Order Confirmed &mdash; Fyndit</title>
+  <style>
+    body, table, td, p, div { margin: 0; padding: 0; font-family: Arial, Helvetica, sans-serif; }
+    body { background: #f1f2f4; color: #1a1a2e; }
+
+    .brand      { font-size: 26px; font-weight: 700; letter-spacing: 3px; color: #ff5c35; }
+    .tagline    { font-size: 10px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-top: 3px; }
+    .hero-title { font-size: 20px; font-weight: 700; color: #1a2744; margin-bottom: 6px; }
+    .hero-sub   { font-size: 13px; color: #6b7280; line-height: 1.6; }
+    .badge      { display: inline-block; background: #e5e7eb; color: #374151; font-size: 11px; font-weight: 700; padding: 4px 14px; border-radius: 99px; border: 1px solid #d1d5db; text-transform: uppercase; letter-spacing: 0.5px; }
+    .lbl        { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; padding-bottom: 3px; }
+    .val        { font-size: 13px; font-weight: 600; color: #1a2744; }
+    .sec-ttl    { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; }
+    .item-name  { font-size: 13px; font-weight: 500; color: #1a1a2e; }
+    .item-qty   { font-size: 11px; color: #6b7280; margin-top: 2px; }
+    .item-price { font-size: 13px; font-weight: 600; color: #1a2744; }
+    .tot-lbl    { font-size: 13px; color: #374151; padding: 5px 0; }
+    .tot-val    { font-size: 13px; color: #374151; padding: 5px 0; text-align: right; }
+    .disc-lbl   { font-size: 13px; color: #16a34a; padding: 5px 0; }
+    .disc-val   { font-size: 13px; color: #16a34a; padding: 5px 0; text-align: right; }
+    .free-ship  { font-size: 13px; color: #16a34a; font-weight: 600; padding: 5px 0; text-align: right; }
+    .grand-lbl  { font-size: 15px; font-weight: 700; color: #1a2744; padding-top: 10px; border-top: 2px solid #1a2744; }
+    .grand-val  { font-size: 15px; font-weight: 700; color: #1a2744; padding-top: 10px; border-top: 2px solid #1a2744; text-align: right; }
+    .addr-line  { font-size: 13px; color: #374151; line-height: 1.8; }
+    .notice-txt { font-size: 13px; color: #1a2744; line-height: 1.7; }
+    .foot-txt   { font-size: 12px; color: #94a3b8; line-height: 1.9; }
+    .foot-acc   { color: #ff5c35; font-weight: 700; }
+    .foot-mut   { font-size: 11px; color: #64748b; }
+  </style>
+</head>
+<body>
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f1f2f4;">
+  <tr>
+    <td align="center" style="padding:20px 0;">
+      <table width="600" cellpadding="0" cellspacing="0" border="0">
+
+        <!-- ── Header ──────────────────────────────────────────── -->
+        <tr>
+          <td style="background:#1a2744;padding:24px 32px;text-align:center;">
+            <div class="brand">FYNDIT</div>
+            <div class="tagline">Your Shopping Destination</div>
+          </td>
+        </tr>
+        <tr><td style="background:#ff5c35;height:4px;font-size:0;">&nbsp;</td></tr>
+
+        <!-- ── Hero ──────────────────────────────────────────── -->
+        <tr>
+          <td style="background:#fff;padding:32px;text-align:center;border-bottom:1px solid #e5e7eb;">
+            <!-- Unicode checkmark in a circle — renders in all email clients -->
+            <table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto 16px;">
+              <tr>
+                <td width="56" height="56" align="center" valign="middle"
+                    style="border:2px solid #22c55e;border-radius:50%;background:#f0fdf4;font-size:30px;font-weight:700;color:#22c55e;line-height:56px;">
+                  &#10003;
+                </td>
+              </tr>
+            </table>
+            <div class="hero-title">Order Placed Successfully!</div>
+            <div class="hero-sub" style="margin-top:6px;">
+              Hi {{user.name}}, thank you for your purchase.<br>
+              Your order has been received and is being processed.
+            </div>
+            <div style="margin-top:14px;"><span class="badge">Pending Confirmation</span></div>
+          </td>
+        </tr>
+
+        <!-- ── Order meta (2-column table grid) ────────────── -->
+        <tr>
+          <td style="background:#fff;padding:20px 32px;border-bottom:1px solid #e5e7eb;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="50%" style="vertical-align:top;padding-bottom:12px;">
+                  <div class="lbl">Order Number</div>
+                  <div class="val">{{orderNumber}}</div>
+                </td>
+                <td width="50%" style="vertical-align:top;padding-bottom:12px;">
+                  <div class="lbl">Order Date</div>
+                  <div class="val">{{date}}</div>
+                </td>
+              </tr>
+              <tr>
+                <td width="50%" style="vertical-align:top;">
+                  <div class="lbl">Payment Method</div>
+                  <div class="val">{{paymentMethod}}</div>
+                </td>
+                <td width="50%" style="vertical-align:top;">
+                  <div class="lbl">Status</div>
+                  <div class="val">Pending</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ── Items ─────────────────────────────────────────── -->
+        <tr>
+          <td style="background:#fff;padding:20px 32px;border-bottom:1px solid #e5e7eb;">
+            <div class="sec-ttl" style="margin-bottom:14px;">Items Ordered</div>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              {{#each items}}
+              <tr>
+                <td style="padding:9px 0;border-bottom:1px solid #f1f2f4;vertical-align:top;">
+                  <div class="item-name">{{product_name}}</div>
+                  <div class="item-qty">Qty: {{quantity}}</div>
+                </td>
+                <td style="padding:9px 0 9px 16px;border-bottom:1px solid #f1f2f4;vertical-align:top;text-align:right;white-space:nowrap;">
+                  <span class="item-price">&#8377;{{line_total}}</span>
+                </td>
+              </tr>
+              {{/each}}
+            </table>
+          </td>
+        </tr>
+
+        <!-- ── Totals ─────────────────────────────────────────── -->
+        <tr>
+          <td style="background:#fff;padding:16px 32px;border-bottom:1px solid #e5e7eb;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td class="tot-lbl">Subtotal</td>
+                <td class="tot-val">&#8377;{{subTotal}}</td>
+              </tr>
+              {{#if hasCouponDiscount}}
+              <tr>
+                <td class="disc-lbl">Coupon Discount</td>
+                <td class="disc-val">&minus; &#8377;{{couponDiscount}}</td>
+              </tr>
+              {{/if}}
+              <tr>
+                <td class="tot-lbl">Shipping Fee</td>
+                {{#if freeShipping}}
+                <td class="free-ship">FREE</td>
+                {{else}}
+                <td class="tot-val">&#8377;{{shippingFee}}</td>
+                {{/if}}
+              </tr>
+              <tr>
+                <td class="grand-lbl">Grand Total</td>
+                <td class="grand-val">&#8377;{{grandTotal}}</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ── Delivery address ──────────────────────────────── -->
+        <tr>
+          <td style="background:#fff;padding:20px 32px;border-bottom:1px solid #e5e7eb;">
+            <div class="sec-ttl" style="margin-bottom:12px;">Delivery Address</div>
+            <div class="addr-line">
+              {{shipTo.line1}}{{#if shipTo.line2}}, {{shipTo.line2}}{{/if}}<br>
+              {{shipTo.city}}, {{shipTo.state}} &mdash; {{shipTo.zip}}<br>
+              {{shipTo.country}}
+            </div>
+          </td>
+        </tr>
+
+        <!-- ── Notice (brand-coloured left border via 4px td) ── -->
+        <tr>
+          <td style="background:#f8fafc;padding:0;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="4" style="background:#1a2744;font-size:0;">&nbsp;</td>
+                <td style="padding:16px 28px;">
+                  <p class="notice-txt">
+                    Your order is currently <strong>Pending</strong> and will be confirmed shortly.
+                    You will be notified once your order is confirmed and dispatched.
+                    Please find your invoice attached to this email for your records.
+                  </p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- ── Footer ─────────────────────────────────────────── -->
+        <tr>
+          <td style="background:#1a2744;padding:24px 32px;text-align:center;">
+            <div class="foot-txt">Thank you for shopping with <span class="foot-acc">FYNDIT</span></div>
+            <div class="foot-txt">For assistance, reach us at support@fyndit.com</div>
+            <div class="foot-mut">&copy; 2026 Fyndit. All rights reserved.</div>
+          </td>
+        </tr>
+
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
