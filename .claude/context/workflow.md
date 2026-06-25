@@ -51,12 +51,17 @@ writing app code, following `design-system.md`:
 
 The output is an **approved visual prototype**. Like the spec, every composition
 choice is the user's — present the design and get approval. The approved prototype
-becomes a source of truth for implementation, alongside the screenshot.
+becomes a source of truth for implementation, alongside the screenshot. It is saved in
+the design project automatically — do not copy-paste it; **`/design`** in Phase 4
+retrieves it directly.
+
+After approval, move to **Phase 3** to record the plan in `current-feature.md` before
+any implementation begins.
 
 > **Reforming an existing screen** follows the *same* path: structure the change as a
 > spec (Phase 1), redesign it in the Fyndit Design System project here (Phase 2), get
-> approval, then implement (Phase 4) by translating the design into the app and
-> migrating the screen onto `@/ui` components + tokens.
+> approval, update `current-feature.md` (Phase 3), then run **`/design`** (Phase 4) to
+> translate it and migrate the screen onto `@/ui` components + tokens.
 
 ---
 
@@ -68,10 +73,13 @@ Before implementing, set the active feature in
 - `Current Feature` — name + spec file
 - `Status` — in progress
 - `Goal`, `Scope / Plan`
+- `Approved Design` — name or path of the approved prototype in the design project
+  (only if Phase 2 ran; omit for backend-only features)
 - Branch name (cut from `main` unless stated otherwise)
 
-This file is the single source of truth for what is being built right now. The
-testing and review agents read it to find the active feature and its spec.
+This file is the single source of truth for what is being built right now. Phase 4
+implementation — including **`/design`** for UI translation — follows the plan recorded
+here. The testing and review agents read it to find the active feature and its spec.
 
 ---
 
@@ -83,9 +91,11 @@ Implement on the feature branch, following:
 - `business-rules.md` — must be followed strictly
 - `development-rules.md` — coding standards, architecture, security
 - `database-design.md` / `prisma-schema.md` — if the schema changes
-- `design-system.md` — translate the approved design into app code (`@/ui`
-  components + CSS Modules using `theme.css` tokens; no inline styles; wire
-  Redux/Router/services). Reuse `@/ui` rather than rebuilding primitives inline.
+- **`/design`** — run this skill to translate the approved prototype into app code.
+  It reads the prototype directly from the claude.ai/design project and uses
+  `current-feature.md` + `design-system.md` as scope context. Produces `@/ui`
+  components + CSS Modules using `theme.css` tokens; no inline styles; wires
+  Redux/Router/services. Reuse `@/ui` rather than rebuilding primitives inline.
 - `screenshots/` — the visual source of truth
 
 Keep code production-ready, typed (no `any`), and feature-isolated.
@@ -173,7 +183,8 @@ Present the proposed context edits and take the user's approval before applying.
 ```
 raw definition → structured spec (user approves every choice)
   → design (if UI: prototype in claude.ai/design w/ FynditUI + tokens, user approves)
-  → current-feature updated → implement (translate design → @/ui + CSS Modules)
+  → current-feature updated (plan + approved design reference)
+  → implement (run /design → reads prototype from design project → @/ui + CSS Modules)
   → test (subagents, report-and-wait)
   → review (4 agents in parallel → report + follow-up fixes)
   → self-improvement (Explore agents refine context, keep design system in sync)

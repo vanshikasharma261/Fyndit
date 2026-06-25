@@ -79,10 +79,11 @@ in the same change** or the design system diverges from the app.
 
 ---
 
-## Running `/design` (Claude Design flow)
+## Designing on claude.ai/design
 
-When `/design` runs, you are composing screens **in the claude.ai/design "Fyndit
-Design System" project**, not editing the app. Rules:
+**claude.ai/design is a browser surface, not a local Claude Code command.** When
+working there, you are composing screens in the "Fyndit Design System" project, not
+editing the app. Rules:
 
 1. **Target the Fyndit Design System project** (id above). Don't create a new
    project; the library is already imported there.
@@ -102,7 +103,8 @@ Design System" project**, not editing the app. Rules:
    decision before designing around it.
 
 The output of a design session is an **approved visual prototype** that becomes a
-source of truth for implementation, alongside the screenshot.
+source of truth for implementation, alongside the screenshot. Bring it back to Claude
+Code and run **`/design`** to translate it into production app code.
 
 ---
 
@@ -123,6 +125,10 @@ When implementing an approved design in `frontend/`, translate — do not paste:
   logic and data live in slices/services. Don't push app concerns into `src/ui`.
 - **Reuse the library.** Prefer an existing `@/ui` component over re-building one
   inline in a page; that's why the library exists.
+
+This translation is a **separate Claude Code step** — it is not automated by
+`/design-sync`. After approving a prototype on claude.ai/design, run **`/design`** in
+Claude Code to start the translation.
 
 ---
 
@@ -146,8 +152,22 @@ steps are required so the two surfaces stay in sync:
 
 ## Sync pipeline + invariants
 
-The library reaches claude.ai/design via `.design-sync/` (config + `conventions.md`
-header + authored previews) and the build output:
+Run **`/design-sync`** from Claude Code to execute the full sync pipeline. It builds
+the library, runs the converter, diffs against the remote project, and uploads
+incrementally — one approval covers the whole run.
+
+**What `/design-sync` uploads to the design project:**
+
+| Artifact | Consumed by | Purpose |
+|---|---|---|
+| `_ds_bundle.js` | Design agent runtime | `window.FynditUI` — all 15 components as globals |
+| `styles.css` + `_ds_bundle.css` | Every rendered design | Tokens + component styles |
+| `<Name>.d.ts` | Design agent | Exact prop contract per component |
+| `<Name>.prompt.md` | Design agent | Usage notes + examples per component |
+| `<Name>.html` | Component picker | Visual preview card in the browser |
+| `_ds_sync.json` | Future re-syncs | Diff anchor — skips unchanged components |
+
+**The pipeline steps `/design-sync` runs internally:**
 
 - **Build first:** `npm --prefix frontend run build:ui` → `frontend/dist-ui/` (ESM
   bundle + `style.css` + `.d.ts` tree; gitignored). This is `cfg.buildCmd`.
@@ -173,8 +193,8 @@ Invariants to protect (from `NOTES.md`):
 
 1. **Screenshots** (`.claude/screenshots/`) — layout + visual truth for screens that
    have one.
-2. **Approved `/design` prototype** — the agreed composition for screens being newly
-   designed or reformed.
+2. **Approved prototype from claude.ai/design** — the agreed composition for screens
+   being newly designed or reformed.
 3. **`@/ui` components + tokens** — the implementation vocabulary; never bypass them
    with raw markup or hardcoded values.
 
